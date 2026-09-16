@@ -1,0 +1,17 @@
+[project]
+name = "expense-tracker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pandas>=3.0.5",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+expense-tracker = "expense_tracker:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
