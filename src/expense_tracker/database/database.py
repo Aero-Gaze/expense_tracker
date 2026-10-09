@@ -20,19 +20,19 @@ class Database:
     """
 
     def __init__(
-        self, db_path: Path = DB_FILE, schema_path: Path = SCHEMA_FILE
+        self, db_file: Path = DB_FILE, schema_file: Path = SCHEMA_FILE
     ) -> None:
-        self.db_path: Path = db_path
-        self.schema_path: Path = schema_path
+        self.db_file: Path = db_file
+        self.schema_file: Path = schema_file
         self._init_db()
 
     def get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_file)
         conn.row_factory = sqlite3.Row
         return conn
 
     def _init_db(self) -> None:
-        query = self.schema_path.read_text(encoding="utf-8")
+        query = self.schema_file.read_text(encoding="utf-8")
         with self.get_connection() as conn:
             conn.executescript(query)
 
