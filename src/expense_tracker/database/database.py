@@ -14,7 +14,7 @@ DB_FILE = DB_DIR / "expenses.db"
 SCHEMA_FILE = SRC_DIR / "schema.sql"
 
 
-class Database:
+class DatabaseManager:
     """
     A database layer to access the database.
     """
