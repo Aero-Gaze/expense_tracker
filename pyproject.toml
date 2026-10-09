@@ -5,7 +5,6 @@ description = "A simple expense tracker using python"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "pandas>=3.0.5",
     "typer>=0.27.2",
 ]
 
