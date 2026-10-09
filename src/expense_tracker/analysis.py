@@ -1,3 +1,5 @@
+from os import listdir
+
 from expense_tracker.database.database import DatabaseManager
 
 
@@ -78,3 +80,24 @@ class ExpenseAnalytics:
         if remaining is None:
             return None
         return remaining < 0
+
+    def average_expense(self) -> list[dict]:
+        """Returns the average expense for all month(s) and year(s)."""
+
+        query = """
+        SELECT ROUND(AVG(monthly_totals.total_spent), 2) AS overall_avg_monthly_spending
+        FROM (
+            SELECT 
+            strftime('%Y-%m', date) AS month_year,
+            SUM(expense) AS total_spent
+            FROM expenses
+            GROUP BY month_year
+        ) AS monthly_totals;
+            """
+
+        conn = self.db.get_connection()
+        try:
+            rows = conn.execute(query).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
