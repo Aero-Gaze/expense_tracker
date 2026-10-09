@@ -78,12 +78,24 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def get_all_expense(self):
-        """List all expenses."""
+    def get_all_expense(self, year: int | None = None, month: int | None = None):
+        """List all expenses, takes year and month as parameter(optional)."""
+        query = "SELECT * FROM expenses WHERE 1=1"
+        params = []
+
+        if year is not None:
+            query += " AND CAST(strftime('%Y', date) AS INTEGER) = ?"
+            params.append(year)
+        if month is not None:
+            query += " AND CAST(strftime('%m', date) AS INTEGER) = ?"
+            params.append(month)
+
+        query += " ORDER BY date DESC"
+
         conn = self.get_connection()
         try:
             with conn:
-                rows = conn.execute("SELECT * FROM expenses").fetchall()
+                rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
         finally:
             conn.close()
