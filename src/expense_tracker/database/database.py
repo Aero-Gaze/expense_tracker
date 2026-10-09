@@ -78,7 +78,7 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def get_all_expense(self, year: int | None = None, month: int | None = None):
+    def get_all_expenses(self, year: int | None = None, month: int | None = None):
         """List all expenses, takes year and month as parameter(optional)."""
         query = "SELECT * FROM expenses WHERE 1=1"
         params = []
