@@ -1,6 +1,4 @@
-from os import listdir
-
-from expense_tracker.database.database import DatabaseManager
+from expense_tracker.database.Database import DatabaseManager
 
 
 class ExpenseAnalytics:
@@ -8,7 +6,7 @@ class ExpenseAnalytics:
         self.db = db_manager
 
     def spending_by_category(self) -> list[dict]:
-        """Returns: [(category, total_spent, transaction_count), ...]"""
+        """Returns category wise spending and count."""
         query = """
         SELECT category,
         sum(expense) as total_spent,
@@ -26,7 +24,7 @@ class ExpenseAnalytics:
             conn.close()
 
     def monthly_spending(self) -> list[dict]:
-        """Returns: [(year, month, total_spent), ...]"""
+        """Returns total monthly spending per year."""
         query = """
         SELECT
         CAST(strftime('%Y', date) AS INTEGER) AS year,
