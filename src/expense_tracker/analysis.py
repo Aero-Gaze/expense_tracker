@@ -42,7 +42,7 @@ class ExpenseAnalytics:
         finally:
             conn.close()
 
-    def budget_vs_actual(self, year: int, month: int) -> float | None:
+    def remaining_budget(self, year: int, month: int) -> float | None:
         """Returns remaining budget (total_budget - total_spent), or None if no budget exists."""
         budget_query = "SELECT amount FROM budget WHERE year = ? AND month = ?"
         expense_query = """
@@ -74,7 +74,7 @@ class ExpenseAnalytics:
 
     def is_over_budget(self, year: int, month: int) -> bool | None:
         """Returns True if over budget, or None if budget does not exist."""
-        remaining = self.budget_vs_actual(year=year, month=month)
+        remaining = self.remaining_budget(year=year, month=month)
         if remaining is None:
             return None
         return remaining < 0
