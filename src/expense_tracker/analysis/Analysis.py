@@ -179,9 +179,10 @@ class ExpenseAnalytics:
                 remaining = None
                 is_over = None
 
-                summary_data["period"] = {"year": year, "month": month}
-                summary_data["monthly_spent"] = monthly_spent
-                summary_data["monthly_budget"] = monthly_budget
-                summary_data["is_over_budget"] = is_over
+            summary_data["period"] = {"year": year, "month": month}
+            summary_data["monthly_spent"] = monthly_spent
+            summary_data["monthly_budget"] = monthly_budget
+            summary_data["remaining_budget"] = remaining
+            summary_data["is_over_budget"] = is_over
 
         return summary_data
