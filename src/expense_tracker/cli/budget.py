@@ -34,7 +34,7 @@ def set(
             max=12,
         ),
     ] = None,
-):
+) -> None:
     """Set the budget for the particular year and month, defaults to current year and month"""
 
     if (year is None) != (month is None):
@@ -60,7 +60,7 @@ def list(
         int | None,
         typer.Option("--month", "-m", help="The month to search", min=1, max=12),
     ] = None,
-):
+) -> None:
     """List all budgets (optionally filtered by year or month or both)."""
 
     db: DatabaseManager = ctx.obj["db"]
@@ -82,7 +82,7 @@ def remove(
         int | None,
         typer.Option("--month", "-m", help="The month to delete", min=1, max=12),
     ] = None,
-):
+) -> None:
     """Remove the specified year and months budget, defaults to remove current month and year budget."""
 
     if (year is None) != (month is None):
