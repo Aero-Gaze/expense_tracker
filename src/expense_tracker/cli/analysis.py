@@ -8,20 +8,27 @@ app = typer.Typer()
 
 
 @app.command()
-def category(ctx: typer.Context) -> None:
-    """Lists category wise spending with transaction count."""
+def category(
+    ctx: typer.Context,
+    year: Annotated[int | None, typer.Option("--year", "-y", help="The year to categorise.")] = None,
+    month: Annotated[int | None, typer.Option("--month", "-m", help="The month to categorise.")] = None
+) -> None:
+    """Lists category wise spending with transaction count, optionally filtered by year and/or month."""
 
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    result = analysis.spending_by_category()
+    result = analysis.spending_by_category(year=year, month=month)
     typer.echo(result)
 
 
 @app.command()
-def monthly(ctx: typer.Context) -> None:
-    """Lists total monthly spending per year."""
+def monthly(
+    ctx: typer.Context,
+    year: Annotated[int | None, typer.Option("--year", "-y", help="The year to search.")] = None
+) -> None:
+    """Lists total monthly spending per year, optionally filtered by year."""
 
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    result = analysis.monthly_spending()
+    result = analysis.monthly_spending(year=year)
     typer.echo(result)
 
 
@@ -33,13 +40,13 @@ def variance(
         int, typer.Option("--month", "-m", help="The month to analyse.", min=1, max=12)
     ],
 ) -> None:
-    """Lists the total budget remaining for a particular month and year."""
+    """Displays the total budget remaining for a particular month and year."""
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
     result = analysis.remaining_budget(year=year, month=month)
     if not result:
         typer.echo("No budget found.")
         return
-    typer.echo(result)
+    typer.echo(result[2])
 
 
 @app.command()
@@ -57,26 +64,28 @@ def over_budget(
 
 
 @app.command()
-def average(ctx: typer.Context) -> None:
+def average(
+    ctx: typer.Context, year: Annotated[int | None, typer.Option("--year", "-y", help="The year to search.")] = None
+) -> None:
     """List the average spending for all months and years."""
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    result = analysis.average_expense()
-    typer.echo(result[0])
+    result = analysis.average_expense(year=year)
+    typer.echo(result)
 
 
 @app.command()
 def summary(
     ctx: typer.Context,
     year: Annotated[
-        int | None, typer.Option("--year", "-y", help="The year to summarize")
+        int | None, typer.Option("--year", "-y", help="The year to summarize.")
     ] = None,
     month: Annotated[
-        int | None, typer.Option("--month", "-m", help="The month to summarize")
+        int | None, typer.Option("--month", "-m", help="The month to summarize.")
     ] = None,
 ) -> None:
     """Overall financial summary."""
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    result = analysis.summary(year, month)
+    result = analysis.summary(year=year, month=month)
 
     typer.echo(result)
 
