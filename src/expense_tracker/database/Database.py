@@ -151,14 +151,24 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def get_all_budgets(self):
-        """List all budgets, in chronological order."""
+    def get_all_budgets(self, year: int | None = None, month: int | None = None):
+        """List all budgets, in chronological order with optional filtering."""
+        query = "SELECT * FROM budget WHERE 1=1"
+        params = []
+
+        if year is not None:
+            query += " AND year = ?"
+            params.append(year)
+        if month is not None:
+            query += " AND month = ?"
+            params.append(month)
+
+        query += " ORDER BY year, month"
+
         conn = self.get_connection()
         try:
             with conn:
-                rows = conn.execute(
-                    "SELECT * FROM budget ORDER BY year, month"
-                ).fetchall()
+                rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
         finally:
