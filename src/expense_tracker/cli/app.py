@@ -2,10 +2,10 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich import console
 from rich.console import Console
 
 from expense_tracker.analysis.Analysis import ExpenseAnalytics
+from expense_tracker.cli.analysis import app as analysis_app
 from expense_tracker.cli.budget import app as budget_app
 from expense_tracker.cli.expense import app as expense_app
 from expense_tracker.database.Database import DB_FILE, SCHEMA_FILE, DatabaseManager
@@ -18,6 +18,7 @@ app = typer.Typer(
 
 app.add_typer(budget_app, name="budget")
 app.add_typer(expense_app, name="expense")
+app.add_typer(analysis_app, name="analysis")
 
 
 @app.callback()
