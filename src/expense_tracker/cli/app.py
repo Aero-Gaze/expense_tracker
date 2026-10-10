@@ -16,9 +16,9 @@ app = typer.Typer(
     add_completion=False,
 )
 
-app.add_typer(budget_app, name="budget")
-app.add_typer(expense_app, name="expense")
-app.add_typer(analysis_app, name="analysis")
+app.add_typer(budget_app, name="budget", help="All commands related to budget.")
+app.add_typer(expense_app, name="expense", help="All commands related to expense.")
+app.add_typer(analysis_app, name="analysis", help="All commands related to analysis.")
 
 
 @app.callback()
