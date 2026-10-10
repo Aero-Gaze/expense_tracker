@@ -99,3 +99,61 @@ class ExpenseAnalytics:
             return [dict(row) for row in rows]
         finally:
             conn.close()
+
+    def summary(self, year: int | None, month: int | None) -> dict:
+        """Returns a comprehensive financial summary."""
+
+        conn = self.db.get_connection()
+        try:
+            cursor = conn.cursor()
+            overall_query = "SELECT SUM(expense) AS total_spent, COUNT(*) AS total_transactions FROM expenses"
+
+            overall_query_res = cursor.execute(overall_query).fetchone()
+
+            total_spent = float(overall_query_res["total_spent"] or 0)
+            total_transactions = int(overall_query_res["total_transactions"] or 0)
+
+            average_spending = self.average_expense()
+            overall_avg_monthly_spending = (
+                average_spending[0]["overall_avg_monthly_spending"]
+                if average_spending
+                else None
+            )
+
+            categories = self.spending_by_category()
+            top_category = categories[0]["category"] if categories else None
+
+            summary_data = {
+                "total_spent_all_time": total_spent,
+                "total_transactions": total_transactions,
+                "overall_avg_monthly_spending": overall_avg_monthly_spending,
+                "top_spending_category": top_category,
+            }
+
+            if year is not None and month is not None:
+                monthly_expense_query = """
+                SELECT SUM(expense) AS monthly_spent FROM expenses
+                WHERE CAST(strftime('%Y', date) AS INTEGER) = ? AND CAST(strftime('%m', date) AS INTEGER) = ?
+                    """
+
+                monthly_expense_query_res = cursor.execute(
+                    monthly_expense_query, (year, month)
+                ).fetchone()
+                monthly_spent = float(monthly_expense_query_res["monthly_spent"])
+
+                budget_query = "SELECT amount FROM budget WHERE year = ? AND month = ?"
+                budget_query_res = cursor.execute(
+                    budget_query, (year, month)
+                ).fetchone()
+                monthly_budget = (
+                    float(budget_query_res["amount"]) if budget_query_res else None
+                )
+
+                summary_data["period"] = {"year": year, "month": month}
+                summary_data["monthly_spent"] = monthly_spent
+                summary_data["monthly_budget"] = monthly_budget
+                summary_data["variance"] = self.remaining_budget(year, month)
+                summary_data["is_over_budget"] = self.is_over_budget(year, month)
+            return summary_data
+        finally:
+            conn.close()

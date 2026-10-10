@@ -64,5 +64,22 @@ def average(ctx: typer.Context) -> None:
     typer.echo(result[0])
 
 
+@app.command()
+def summary(
+    ctx: typer.Context,
+    year: Annotated[
+        int | None, typer.Option("--year", "-y", help="The year to summarize")
+    ] = None,
+    month: Annotated[
+        int | None, typer.Option("--month", "-m", help="The month to summarize")
+    ] = None,
+) -> None:
+    """Overall financial summary."""
+    analysis: ExpenseAnalytics = ctx.obj["analysis"]
+    result = analysis.summary(year, month)
+
+    typer.echo(result)
+
+
 if __name__ == "__main__":
     app()
