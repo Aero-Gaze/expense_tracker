@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import console
+from rich.console import Console
 
 from expense_tracker.analysis.Analysis import ExpenseAnalytics
 from expense_tracker.cli.budget import app as budget_app
@@ -31,6 +33,7 @@ def main(
     ctx.ensure_object(dict)
     ctx.obj["db"] = DatabaseManager()
     ctx.obj["analysis"] = ExpenseAnalytics(ctx.obj["db"])
+    ctx.obj["console"] = Console()
 
 
 if __name__ == "__main__":
