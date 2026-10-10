@@ -72,5 +72,33 @@ def list(
     typer.echo(budgets)
 
 
+@app.command()
+def remove(
+    ctx: typer.Context,
+    year: Annotated[
+        int | None, typer.Option("--year", "-y", help="The year to delete.")
+    ] = None,
+    month: Annotated[
+        int | None,
+        typer.Option("--month", "-m", help="The month to delete", min=1, max=12),
+    ] = None,
+):
+    """Remove the specified year and months budget, defaults to remove current month and year budget."""
+
+    if (year is None) != (month is None):
+        raise typer.BadParameter("Both --year and --month must be provided together.")
+
+    db: DatabaseManager = ctx.obj["db"]
+
+    target_year = year if year is not None else datetime.now().year
+    target_month = month if month is not None else datetime.now().month
+
+    result = db.delete_budget(year=target_year, month=target_month)
+    if not result:
+        typer.echo("No budget was deleted.")
+        return
+    typer.echo(f"Budget successfully removed for {target_year}/{target_month}")
+
+
 if __name__ == "__main__":
     app()
