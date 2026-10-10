@@ -1,6 +1,4 @@
-from re import A
 from typing import Annotated
-from warnings import resetwarnings
 
 import typer
 
