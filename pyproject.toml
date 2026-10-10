@@ -4,12 +4,10 @@ version = "0.1.0"
 description = "A simple expense tracker using python"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
-    "typer>=0.27.2",
-]
+dependencies = ["typer>=0.27.2"]
 
 [project.scripts]
-expense-tracker = "expense_tracker:main"
+expense-tracker = "expense_tracker.__main__:app"
 
 [build-system]
 requires = ["uv_build>=0.12.15,<0.13.0"]
