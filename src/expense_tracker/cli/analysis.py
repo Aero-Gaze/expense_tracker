@@ -24,7 +24,12 @@ def category(
     ctx: typer.Context,
     year: Annotated[
         int | None,
-        typer.Option("--year", "-y", help="Filter spending by specific year."),
+        typer.Option(
+            "--year",
+            "-y",
+            help="Filter spending by specific year.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
     month: Annotated[
         int | None,
@@ -32,12 +37,16 @@ def category(
             "--month",
             "-m",
             help="Filter spending by specific month [1-12].",
+            rich_help_panel="Date Arguments",
             min=1,
             max=12,
         ),
     ] = None,
 ) -> None:
-    """Lists category-wise spending with transaction counts."""
+    """Lists category-wise spending with transaction counts.
+
+    Optionally filter results by year and/or month.
+    """
 
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
     result = analysis.spending_by_category(year=year, month=month)
@@ -49,10 +58,18 @@ def monthly(
     ctx: typer.Context,
     year: Annotated[
         int | None,
-        typer.Option("--year", "-y", help="Filter monthly spending by specific year."),
+        typer.Option(
+            "--year",
+            "-y",
+            help="Filter monthly spending by specific year.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
 ) -> None:
-    """Lists total monthly spending."""
+    """Lists total monthly spending.
+
+    Optionally filter results by year.
+    """
 
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
     result = analysis.monthly_spending(year=year)
@@ -63,16 +80,31 @@ def monthly(
 def variance(
     ctx: typer.Context,
     year: Annotated[
-        int | None, typer.Option("--year", "-y", help="The year to analyse.")
+        int | None,
+        typer.Option(
+            "--year",
+            "-y",
+            help="The year to analyse.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
     month: Annotated[
         int | None,
         typer.Option(
-            "--month", "-m", help="The month to analyse [1-12].", min=1, max=12
+            "--month",
+            "-m",
+            help="The month to analyse [1-12].",
+            rich_help_panel="Date Arguments",
+            min=1,
+            max=12,
         ),
     ] = None,
 ) -> None:
-    """Displays the remaining budget for a specific month and year."""
+    """Displays the remaining budget for a specific month and year.
+
+    Defaults to the current month and year if neither is provided. Both --year
+    and --month must be specified together for filtering.
+    """
     target_year, target_month = _resolve_target_date(year=year, month=month)
 
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
@@ -88,16 +120,32 @@ def variance(
 def over_budget(
     ctx: typer.Context,
     year: Annotated[
-        int | None, typer.Option("--year", "-y", help="The year to analyse.")
+        int | None,
+        typer.Option(
+            "--year",
+            "-y",
+            help="The year to analyse.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
     month: Annotated[
         int | None,
         typer.Option(
-            "--month", "-m", help="The month to analyse [1-12].", min=1, max=12
+            "--month",
+            "-m",
+            help="The month to analyse [1-12].",
+            rich_help_panel="Date Arguments",
+            min=1,
+            max=12,
         ),
     ] = None,
 ) -> None:
-    """Check if spending exceeded the budget for a given period."""
+    """Check if spending exceeded the budget for a given period.
+
+    Return True if over budget, otherwise False, or None if no budget is found.
+    Defaults to the current month and year if neither is provided. Both --year
+    and --month must be specified together if filtering manually.
+    """
 
     target_year, target_month = _resolve_target_date(year=year, month=month)
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
@@ -112,11 +160,17 @@ def average(
     year: Annotated[
         int | None,
         typer.Option(
-            "--year", "-y", help="Filter average spending by a specific year."
+            "--year",
+            "-y",
+            help="Filter average spending by a specific year.",
+            rich_help_panel="Date Arguments",
         ),
     ] = None,
 ) -> None:
-    """List average spending across all recorded months and years."""
+    """List average spending across all recorded months and years.
+
+    Optionally filter results by year.
+    """
     analysis: ExpenseAnalytics = ctx.obj["analysis"]
     result = analysis.average_expense(year=year)
     typer.echo(result)
@@ -127,7 +181,12 @@ def summary(
     ctx: typer.Context,
     year: Annotated[
         int | None,
-        typer.Option("--year", "-y", help="Filter summary by a specific year."),
+        typer.Option(
+            "--year",
+            "-y",
+            help="Filter summary by a specific year.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
     month: Annotated[
         int | None,
@@ -135,6 +194,7 @@ def summary(
             "--month",
             "-m",
             help="Filter summary by a specific month [1-12].",
+            rich_help_panel="Date Arguments",
             min=1,
             max=12,
         ),
