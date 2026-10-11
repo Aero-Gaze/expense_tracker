@@ -8,12 +8,21 @@ from expense_tracker.database.Database import DatabaseManager
 app = typer.Typer()
 
 
+def _resolve_target_date(year: int | None, month: int | None) -> tuple[int, int]:
+    """Validate that year and month are provided together, defaulting to today."""
+    if (year is None) != (month is None):
+        raise typer.BadParameter("Both --year and --month must be provided together.")
+
+    target_year = year if year is not None else datetime.now().year
+    target_month = month if month is not None else datetime.now().month
+
+    return (target_year, target_month)
+
+
 @app.command()
 def set(
     ctx: typer.Context,
-    budget: Annotated[
-        int, typer.Argument(help="The budget amount for the month", min=0)
-    ],
+    budget: Annotated[int, typer.Argument(help="The budget amount to set.", min=0)],
     year: Annotated[
         int | None,
         typer.Option(
@@ -28,22 +37,22 @@ def set(
         typer.Option(
             "--month",
             "-m",
-            help="The month for the budget",
+            help="The month for the budget [1-12]",
             rich_help_panel="Date Arguments",
             min=1,
             max=12,
         ),
     ] = None,
 ) -> None:
-    """Set the budget for the particular year and month, defaults to current year and month"""
+    """Set or update the budget for a specific month and year
 
-    if (year is None) != (month is None):
-        raise typer.BadParameter("Both --year and --month must be provided together.")
+    Defaults to the currrent month and year if neither is provided. Both --year
+    and --month must be specified together if setting or updating manually.
+    """
+
+    target_year, target_month = _resolve_target_date(year=year, month=month)
 
     db: DatabaseManager = ctx.obj["db"]
-
-    target_year = year if year is not None else datetime.now().year
-    target_month = month if month is not None else datetime.now().month
 
     db.set_budget(year=target_year, month=target_month, amount=budget)
 
@@ -54,14 +63,30 @@ def set(
 def list(
     ctx: typer.Context,
     year: Annotated[
-        int | None, typer.Option("--year", "-y", help="The year to search")
+        int | None,
+        typer.Option(
+            "--year",
+            "-y",
+            help="Filter budgets by a specific year.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
     month: Annotated[
         int | None,
-        typer.Option("--month", "-m", help="The month to search", min=1, max=12),
+        typer.Option(
+            "--month",
+            "-m",
+            help="Filter budgets by a specific month.",
+            rich_help_panel="Date Arguments",
+            min=1,
+            max=12,
+        ),
     ] = None,
 ) -> None:
-    """List all budgets (optionally filtered by year or month or both)."""
+    """List all recorded budgets.
+
+    Optionally filter results by year and/or month.
+    """
 
     db: DatabaseManager = ctx.obj["db"]
     budgets = db.get_all_budgets(year=year, month=month)
@@ -76,22 +101,35 @@ def list(
 def remove(
     ctx: typer.Context,
     year: Annotated[
-        int | None, typer.Option("--year", "-y", help="The year to delete.")
+        int | None,
+        typer.Option(
+            "--year",
+            "-y",
+            help="The year of the budget to delete.",
+            rich_help_panel="Date Arguments",
+        ),
     ] = None,
     month: Annotated[
         int | None,
-        typer.Option("--month", "-m", help="The month to delete", min=1, max=12),
+        typer.Option(
+            "--month",
+            "-m",
+            help="The month of the budget to delete",
+            rich_help_panel="Date Arguments",
+            min=1,
+            max=12,
+        ),
     ] = None,
 ) -> None:
-    """Remove the specified year and months budget, defaults to remove current month and year budget."""
+    """Delete the budget for a specific year and month.
 
-    if (year is None) != (month is None):
-        raise typer.BadParameter("Both --year and --month must be provided together.")
+    Defaults to the current month and year if neither is provided. Both --year
+    and --month must be specified together if removing manually.
+    """
+
+    target_year, target_month = _resolve_target_date(year=year, month=month)
 
     db: DatabaseManager = ctx.obj["db"]
-
-    target_year = year if year is not None else datetime.now().year
-    target_month = month if month is not None else datetime.now().month
 
     result = db.delete_budget(year=target_year, month=target_month)
     if not result:
