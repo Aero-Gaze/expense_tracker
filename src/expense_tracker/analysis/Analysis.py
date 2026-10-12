@@ -42,7 +42,8 @@ class ExpenseAnalytics:
         SELECT
         CAST(strftime('%Y', date) AS INTEGER) AS year,
         CAST(strftime('%m', date) AS INTEGER) AS month,
-        SUM(expense) as total_spent
+        SUM(expense) as total_spent,
+        COUNT(expense) as transaction_count
         FROM expenses WHERE 1=1
         """
         params = []
@@ -51,7 +52,7 @@ class ExpenseAnalytics:
             query += " AND year = ?"
             params.append(year)
 
-        query += " GROUP BY year, month ORDER BY year, month DESC"
+        query += " GROUP BY year, month ORDER BY year DESC, month"
 
         conn = self.db.get_connection()
         try:
