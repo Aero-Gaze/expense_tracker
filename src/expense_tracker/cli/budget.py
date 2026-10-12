@@ -2,6 +2,9 @@ from datetime import datetime
 from typing import Annotated
 
 import typer
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
 from expense_tracker.database.Database import DatabaseManager
 
@@ -22,7 +25,7 @@ def _resolve_target_date(year: int | None, month: int | None) -> tuple[int, int]
 @app.command()
 def set(
     ctx: typer.Context,
-    budget: Annotated[int, typer.Argument(help="The budget amount to set.", min=0)],
+    budget: Annotated[float, typer.Argument(help="The budget amount to set.", min=0)],
     year: Annotated[
         int | None,
         typer.Option(
@@ -53,10 +56,16 @@ def set(
     target_year, target_month = _resolve_target_date(year=year, month=month)
 
     db: DatabaseManager = ctx.obj["db"]
+    console: Console = ctx.obj["console"]
 
-    db.set_budget(year=target_year, month=target_month, amount=budget)
+    result = db.set_budget(year=target_year, month=target_month, amount=budget)
+    if not result:
+        console.print("[red]✖[/red] No budgets were updated.")
+        raise typer.Exit()
 
-    typer.echo(f"Bugdet Successfully updated for {target_year}/{target_month}")
+    console.print(
+        f"[bold green]✓[/bold green] Budget was successfully updated for [cyan]{target_year}/{target_month}[/cyan]"
+    )
 
 
 @app.command()
@@ -89,12 +98,30 @@ def list(
     """
 
     db: DatabaseManager = ctx.obj["db"]
+    console: Console = ctx.obj["console"]
     budgets = db.get_all_budgets(year=year, month=month)
 
     if not budgets:
-        typer.echo("No budgets found")
-        return
-    typer.echo(budgets)
+        console.print("i [dim]No budgets found in the database.[/dim]")
+        raise typer.Exit()
+
+    table = Table(title="Budgets", box=box.ROUNDED)
+
+    # Format: (column_name, style)
+    columns = [
+        ("ID", "cyan"),
+        ("Year", "cyan"),
+        ("Month", "cyan"),
+        ("Amount", "green"),
+    ]
+    for column_name, style in columns:
+        table.add_column(column_name, style=style)
+
+    for dict_row in budgets:
+        rows = [str(row) for row in dict_row.values()]
+        table.add_row(*rows)
+
+    console.print(table)
 
 
 @app.command()
@@ -130,12 +157,17 @@ def remove(
     target_year, target_month = _resolve_target_date(year=year, month=month)
 
     db: DatabaseManager = ctx.obj["db"]
+    console: Console = ctx.obj["console"]
 
     result = db.delete_budget(year=target_year, month=target_month)
     if not result:
-        typer.echo("No budget was deleted.")
-        return
-    typer.echo(f"Budget successfully removed for {target_year}/{target_month}")
+        console.print(
+            f"[yellow]![/yellow] No budget found to remove for [cyan]{target_year}/{target_month}[/cyan]"
+        )
+        raise typer.Exit()
+    console.print(
+        f"[red]-[/red] Budget was successfully removed for [cyan]{target_year}/{target_month}[/cyan]"
+    )
 
 
 if __name__ == "__main__":
