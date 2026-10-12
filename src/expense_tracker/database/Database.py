@@ -116,12 +116,12 @@ class DatabaseManager:
     # Budget Methods
     # --------------
 
-    def set_budget(self, year: int, month: int, amount: int):
+    def set_budget(self, year: int, month: int, amount: float) -> bool:
         """Create or update a budget for the given month"""
         conn = self.get_connection()
         try:
             with conn:
-                conn.execute(
+                cursor = conn.execute(
                     """INSERT INTO budget (year, month, amount)
                     VALUES (?, ?, ?)
                     ON CONFLICT (year, month)
@@ -129,6 +129,7 @@ class DatabaseManager:
                     """,
                     (year, month, amount),
                 )
+            return cursor.rowcount > 0
         finally:
             conn.close()
 
