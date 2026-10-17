@@ -1,17 +1,12 @@
-import sqlite3
-from pathlib import Path
-
-# Base locations
-SRC_DIR = Path(__file__).resolve().parent
-BASE_DIR = SRC_DIR.parents[2]  # Equivalent to .parent.parent.parent.parent
+import mariadb
 
 
-# Resource paths
-DB_DIR = BASE_DIR / "data"
-DB_DIR.mkdir(parents=True, exist_ok=True)
-
-DB_FILE = DB_DIR / "expenses.db"
-SCHEMA_FILE = SRC_DIR / "schema.sql"
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "",
+    "password": "",
+    "database": "project_db",
+}
 
 
 class DatabaseManager:
@@ -19,22 +14,40 @@ class DatabaseManager:
     A database layer to access the database.
     """
 
-    def __init__(
-        self, db_file: Path = DB_FILE, schema_file: Path = SCHEMA_FILE
-    ) -> None:
-        self.db_file: Path = db_file
-        self.schema_file: Path = schema_file
+    def __init__(self, db_config: dict[str, str] = DB_CONFIG) -> None:
+        self.db_config: dict[str, str] = db_config
         self._init_db()
 
-    def get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_file)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def get_connection(self) -> mariadb.Connection:
+        return mariadb.connect(**self.db_config)
 
     def _init_db(self) -> None:
-        query = self.schema_file.read_text(encoding="utf-8")
-        with self.get_connection() as conn:
-            conn.executescript(query)
+        create_queries: list[str] = [
+            """
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                category VARCHAR(255) NOT NULL,
+                description TEXT,
+                expense DECIMAL(10, 2) NOT NULL CHECK (expense >= 0),
+                date DATE NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS budgets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                year INT NOT NULL CHECK (year BETWEEN 1 AND 9999),
+                month INT NOT NULL CHECK (month BETWEEN 1 and 12),
+                amount DECIMAL(10, 2) NOT NULL CHECK (amount >= 0),
+
+                UNIQUE(year, month)
+            )
+            """,
+        ]
+        with self.get_connection() as conn, conn.cursor() as cursor:
+            for query in create_queries:
+                cursor.execute(query)
+            conn.commit()
 
     # ---------------
     # Expense Methods
@@ -48,69 +61,63 @@ class DatabaseManager:
         description: str | None = None,
     ) -> int | None:
         """Inserts an expense and return its ID."""
-
-        conn = self.get_connection()
-        try:
-            with conn:
-                cursor = conn.execute(
-                    """INSERT INTO expenses(name, category, description, expense, date)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (name, category, description, expense, date),
-                )
-
-                expense_id = cursor.lastrowid
-
-            return expense_id
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO expenses(name, category, description, expense, date) 
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (name, category, description, expense, date),
+            )
+            conn.commit()
+            return cursor.lastrowid
 
     def get_expense(self, expense_id: int) -> dict | None:
         """Returns one expense or None if it doesn't exist."""
 
-        conn = self.get_connection()
-        try:
-            with conn:
-                row = conn.execute(
-                    "SELECT * FROM expenses WHERE id = ?", (expense_id,)
-                ).fetchone()
-            return dict(row) if row else None
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM expenses WHERE id = %s
+                """,
+                (expense_id,),
+            )
+            row = cursor.fetchone()
+            return row if row else None
 
-    def get_all_expenses(self, year: int | None = None, month: int | None = None):
+    def get_all_expenses(
+        self, year: int | None = None, month: int | None = None
+    ) -> list[dict] | None:
         """List all expenses, takes year and month as parameter(optional)."""
-        query = "SELECT * FROM expenses WHERE 1=1"
+        query = ["SELECT * FROM expenses WHERE 1=1"]
         params = []
 
         if year is not None:
-            query += " AND CAST(strftime('%Y', date) AS INTEGER) = ?"
+            query.append("AND YEAR(date) = %s")
             params.append(year)
         if month is not None:
-            query += " AND CAST(strftime('%m', date) AS INTEGER) = ?"
+            query.append("AND MONTH(date) = %s")
             params.append(month)
 
-        query += " ORDER BY date DESC"
+        query.append("ORDER BY date DESC")
 
-        conn = self.get_connection()
-        try:
-            with conn:
-                rows = conn.execute(query, params).fetchall()
-            return [dict(row) for row in rows]
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(" ".join(query), params)
+            rows = cursor.fetchall()
+            return rows if rows else None
 
     def delete_expense(self, expense_id: int) -> bool:
         """Deletes an expense by id. Returns False if not found"""
-        conn = self.get_connection()
-        try:
-            with conn:
-                cursor = conn.execute(
-                    "DELETE FROM expenses WHERE id = ?", (expense_id,)
-                )
-            return cursor.rowcount > 0
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM expenses WHERE id = %s
+                """,
+                (expense_id,),
+            )
+            row_count = cursor.rowcount
+            conn.commit()
+            return row_count > 0
 
     # --------------
     # Budget Methods
@@ -118,81 +125,62 @@ class DatabaseManager:
 
     def set_budget(self, year: int, month: int, amount: float) -> bool:
         """Create or update a budget for the given month"""
-        conn = self.get_connection()
-        try:
-            with conn:
-                cursor = conn.execute(
-                    """INSERT INTO budget (year, month, amount)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT (year, month)
-                    DO UPDATE SET amount = excluded.amount
-                    """,
-                    (year, month, amount),
-                )
-            return cursor.rowcount > 0
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO budgets(year, month, amount)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE amount = VALUES(amount)
+                """,
+                (year, month, amount),
+            )
+            row_count = cursor.rowcount
+            conn.commit()
+            return row_count > 0
 
-    def get_budget(self, year: int, month: int) -> dict | None:
-        """Return a budget for a given year and month."""
-        conn = self.get_connection()
-        try:
-            with conn:
-                row = conn.execute(
-                    """
-                    SELECT *
-                    FROM budget
-                    WHERE year = ?
-                    AND month = ?
-                    """,
-                    (year, month),
-                ).fetchone()
-
-            return dict(row) if row else None
-        finally:
-            conn.close()
-
-    def get_all_budgets(self, year: int | None = None, month: int | None = None):
+    def get_budgets(
+        self, year: int | None = None, month: int | None = None
+    ) -> list[dict] | None:
         """List all budgets, in chronological order with optional filtering."""
-        query = "SELECT * FROM budget WHERE 1=1"
+        query = ["SELECT * FROM budgets WHERE 1=1"]
         params = []
 
         if year is not None:
-            query += " AND year = ?"
+            query.append("AND year = %s")
             params.append(year)
         if month is not None:
-            query += " AND month = ?"
+            query.append("AND month = %s")
             params.append(month)
 
-        query += " ORDER BY year, month"
+        query.append("ORDER BY year, month")
 
-        conn = self.get_connection()
-        try:
-            with conn:
-                rows = conn.execute(query, params).fetchall()
-            return [dict(row) for row in rows]
-
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(" ".join(query), params)
+            rows = cursor.fetchall()
+            return rows if rows else None
 
     def delete_budget(self, year: int, month: int) -> bool:
         """Deletes a month's budget for a particular year. Return False if not found."""
-        conn = self.get_connection()
-        try:
-            with conn:
-                cursor = conn.execute(
-                    "DELETE FROM budget WHERE year = ? AND month = ?", (year, month)
-                )
-            return cursor.rowcount > 0
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM budgets WHERE year = %s AND month = %s
+                """,
+                (year, month),
+            )
+            row_count = cursor.rowcount
+            conn.commit()
+            return row_count > 0
 
     def delete_budget_by_id(self, budget_id: int):
         """Deletes a budget by id. Returns False if not found"""
-        conn = self.get_connection()
-        try:
-            with conn:
-                cursor = conn.execute("DELETE FROM budget WHERE id = ?", (budget_id,))
-            return cursor.rowcount > 0
-        finally:
-            conn.close()
+        with self.get_connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM budgets WHERE id = %s
+                """,
+                (budget_id,),
+            )
+            row_count = cursor.rowcount
+            conn.commit()
+            return row_count > 0
