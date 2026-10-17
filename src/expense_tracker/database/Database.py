@@ -115,9 +115,9 @@ class DatabaseManager:
                 """,
                 (expense_id,),
             )
-            affected_rows = cursor.rowcount
+            row_count = cursor.rowcount
             conn.commit()
-            return affected_rows > 0
+            return row_count > 0
 
     # --------------
     # Budget Methods
@@ -134,8 +134,9 @@ class DatabaseManager:
                 """,
                 (year, month, amount),
             )
+            row_count = cursor.rowcount
             conn.commit()
-            return True
+            return row_count > 0
 
     def get_budgets(
         self, year: int | None = None, month: int | None = None
@@ -167,8 +168,9 @@ class DatabaseManager:
                 """,
                 (year, month),
             )
+            row_count = cursor.rowcount
             conn.commit()
-            return cursor.rowcount > 0
+            return row_count > 0
 
     def delete_budget_by_id(self, budget_id: int):
         """Deletes a budget by id. Returns False if not found"""
@@ -179,5 +181,6 @@ class DatabaseManager:
                 """,
                 (budget_id,),
             )
+            row_count = cursor.rowcount
             conn.commit()
-            return cursor.rowcount > 0
+            return row_count > 0
