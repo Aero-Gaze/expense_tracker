@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from expense_tracker.database.database import DatabaseManager
+from expense_tracker.database import DatabaseManager
 
 app = typer.Typer()
 

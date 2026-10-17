@@ -6,7 +6,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from expense_tracker.database.database import DatabaseManager
+from expense_tracker.database import DatabaseManager
 
 app = typer.Typer()
 
