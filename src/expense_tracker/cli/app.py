@@ -4,11 +4,11 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from expense_tracker.analysis.Analysis import ExpenseAnalytics
+from expense_tracker.analysis.analysis import ExpenseAnalytics
 from expense_tracker.cli.analysis import app as analysis_app
 from expense_tracker.cli.budget import app as budget_app
 from expense_tracker.cli.expense import app as expense_app
-from expense_tracker.database.Database import DB_FILE, SCHEMA_FILE, DatabaseManager
+from expense_tracker.database.database import DB_FILE, SCHEMA_FILE, DatabaseManager
 
 app = typer.Typer(
     name="expense-tracker",

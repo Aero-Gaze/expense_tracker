@@ -9,7 +9,7 @@ class ExpenseAnalytics:
 
     def spending_by_category(
         self, year: int | None = None, month: int | None = None
-    ) -> list[dict] | None:
+    ) -> list[dict]:
         """Returns category wise spending and count, optionally filtered by year and/or month."""
         query = [
             """
@@ -34,7 +34,7 @@ class ExpenseAnalytics:
             cursor.execute(" ".join(query), tuple(params))
             return cursor.fetchall()
 
-    def monthly_spending(self, year: int | None = None) -> list[dict] | None:
+    def monthly_spending(self, year: int | None = None) -> list[dict]:
         """Returns total monthly spending per year, optionally filtered by year."""
         query = [
             """
@@ -63,7 +63,7 @@ class ExpenseAnalytics:
         query = """
         SELECT 
             B.amount AS total_budget,
-            COALESCE(SUM(E.expenses), 0) AS total_spent
+            COALESCE(SUM(E.expense), 0) AS total_spent
         FROM budgets AS B
         LEFT JOIN expenses AS E
             ON YEAR(E.date) = B.year
@@ -79,8 +79,8 @@ class ExpenseAnalytics:
         if result is None:
             return None
 
-        total_budget = Decimal(str(result["total_budget"]))
-        total_spent = Decimal(str(result["total_spent"]))
+        total_budget = result["total_budget"]
+        total_spent = result["total_spent"]
 
         return {
             "total_budget": total_budget,
@@ -95,8 +95,7 @@ class ExpenseAnalytics:
             return None
         return budget["remaining"] < 0
 
-    # TODO: Fix average_expense query
-    def average_expense(self, year: int | None = None) -> dict | None:
+    def average_expense(self, year: int | None = None) -> Decimal | None:
         """Returns the average expense for a particular or all the years."""
 
         query = [
@@ -124,9 +123,9 @@ class ExpenseAnalytics:
         with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
             cursor.execute(" ".join(query), params)
             result = cursor.fetchone()
-            return result if result else None
+            return result["average_monthly_spending"] if result else None
 
-    def summary(self, year: int | None, month: int | None) -> dict:
+    def summary(self, year: int | None = None, month: int | None = None) -> dict:
         """Returns a comprehensive financial summary."""
 
         with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
@@ -134,16 +133,13 @@ class ExpenseAnalytics:
             cursor.execute(overall_query)
             overall = cursor.fetchone()
 
-        total_spent = float(overall["total_spent"] or 0)
-        total_transactions = int(overall["total_transactions"] or 0)
+        total_spent = float(overall["total_spent"] or Decimal(0))
+        total_transactions = int(overall["total_transactions"] or Decimal(0))
 
-        average_spending_dict = self.average_expense(year=year) or {}
+        overall_avg_monthly_spending = self.average_expense(year=year) or 0.0
         categories = self.spending_by_category(year=year, month=month)
 
         top_category = categories[0]["category"] if categories else None
-        overall_avg_monthly_spending = average_spending_dict.get(
-            "overall_avg_monthly_spending", 0.0
-        )
 
         summary_data = {
             "total_spent_all_time": total_spent,
@@ -157,7 +153,9 @@ class ExpenseAnalytics:
         budget_data = self.remaining_budget(year=year, month=month)
 
         if budget_data is not None:
-            monthly_budget, monthly_spent, remaining = budget_data
+            monthly_budget = budget_data["total_budget"]
+            monthly_spent = budget_data["total_spent"]
+            remaining = budget_data["remaining"]
             is_over = remaining < 0
         else:
             monthly_budget = None
@@ -167,9 +165,8 @@ class ExpenseAnalytics:
 
             months = self.monthly_spending(year=year)
 
-            if months:
-                match = next((m for m in months if m["month"] == month), None)
-                monthly_spent = match["total_spent"] if match else 0.0
+            match = next((m for m in months if m["month"] == month), None)
+            monthly_spent = match["total_spent"] if match else 0.0
 
         summary_data["year"] = year
         summary_data["month"] = month
