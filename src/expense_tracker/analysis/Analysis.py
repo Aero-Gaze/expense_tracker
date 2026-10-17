@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from expense_tracker.database.Database import DatabaseManager
 
 
@@ -9,152 +11,139 @@ class ExpenseAnalytics:
         self, year: int | None = None, month: int | None = None
     ) -> list[dict] | None:
         """Returns category wise spending and count, optionally filtered by year and/or month."""
-        query = """
-        SELECT category,
-        sum(expense) as total_spent,
-        COUNT(expense) as transaction_count
-        FROM expenses WHERE 1=1
-        """
+        query = [
+            """
+            SELECT category,
+                SUM(expense) as total_spent,
+                COUNT(expense) as transaction_count
+            FROM expenses WHERE 1=1
+            """
+        ]
         params = []
 
         if year is not None:
-            query += " AND CAST(strftime('%Y', date) AS INTEGER) = ?"
+            query.append("AND YEAR(date) = %s")
             params.append(year)
         if month is not None:
-            query += " AND CAST(strftime('%m', date) AS INTEGER) = ?"
+            query.append("AND MONTH(date) = %s")
             params.append(month)
 
-        query += " GROUP BY category ORDER BY total_spent DESC"
+        query.append("GROUP BY category ORDER BY total_spent DESC")
 
-        conn = self.db.get_connection()
-        try:
-            result = conn.execute(query, params).fetchall()
-            if not result:
-                return None
-            return [dict(row) for row in result]
-
-        finally:
-            conn.close()
+        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(" ".join(query), tuple(params))
+            return cursor.fetchall()
 
     def monthly_spending(self, year: int | None = None) -> list[dict] | None:
         """Returns total monthly spending per year, optionally filtered by year."""
-        query = """
-        SELECT
-        CAST(strftime('%Y', date) AS INTEGER) AS year,
-        CAST(strftime('%m', date) AS INTEGER) AS month,
-        SUM(expense) as total_spent,
-        COUNT(expense) as transaction_count
-        FROM expenses WHERE 1=1
-        """
+        query = [
+            """
+            SELECT
+                YEAR(date) AS year,
+                MONTH(date) AS month,
+                SUM(expense) as total_spent,
+            COUNT(expense) as transaction_count
+            FROM expenses WHERE 1=1
+            """
+        ]
         params = []
 
         if year is not None:
-            query += " AND year = ?"
+            query.append("AND YEAR(date) = %s")
             params.append(year)
 
-        query += " GROUP BY year, month ORDER BY year DESC, month"
+        query.append("GROUP BY year, month ORDER BY year DESC, month")
 
-        conn = self.db.get_connection()
-        try:
-            result = conn.execute(query, params).fetchall()
-            if not result:
-                return None
-            return [dict(row) for row in result]
-        finally:
-            conn.close()
+        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(" ".join(query), tuple(params))
+            return cursor.fetchall()
 
-    def remaining_budget(self, year: int, month: int) -> tuple[float, ...] | None:
+    def remaining_budget(self, year: int, month: int) -> dict[str, Decimal] | None:
         """Returns (total_budget, total_spent, total_budget - total_spent), or None if no budget exists."""
-        budget_query = "SELECT amount FROM budget WHERE year = ? AND month = ?"
-        expense_query = """
-                SELECT
-                SUM(expense)
-                FROM expenses
-                WHERE 
-                CAST(strftime('%Y', date) AS INTEGER) = ?
-                AND CAST(strftime('%m', date) AS INTEGER) = ?
-                """
+        query = """
+        SELECT 
+            B.amount AS total_budget,
+            COALESCE(SUM(E.expenses), 0) AS total_spent
+        FROM budgets AS B
+        LEFT JOIN expenses AS E
+            ON YEAR(E.date) = B.year
+            AND MONTH(E.date) = B.month
+        WHERE B.year = %s AND B.month = %s
+        GROUP BY B.amount
+        """
 
-        conn = self.db.get_connection()
-        try:
-            cursor = conn.cursor()
+        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(query, (year, month))
+            result = cursor.fetchone()
 
-            budget_result = cursor.execute(budget_query, (year, month)).fetchone()
+        if result is None:
+            return None
 
-            if budget_result is None:
-                return None
-            total_budget = float(budget_result["amount"])
+        total_budget = Decimal(str(result["total_budget"]))
+        total_spent = Decimal(str(result["total_spent"]))
 
-            spent_result = cursor.execute(expense_query, (year, month)).fetchone()
-
-            total_spent = float(spent_result[0] or 0.0)
-
-            variance = total_budget - total_spent
-            return (total_budget, total_spent, variance)
-        finally:
-            conn.close()
+        return {
+            "total_budget": total_budget,
+            "total_spent": total_spent,
+            "remaining": total_budget - total_spent,
+        }
 
     def is_over_budget(self, year: int, month: int) -> bool | None:
         """Returns True if over budget, or None if budget does not exist."""
-        remaining = self.remaining_budget(year=year, month=month)
-        if remaining is None:
+        budget = self.remaining_budget(year=year, month=month)
+        if budget is None:
             return None
-        variance = remaining[2]
-        return variance < 0
+        return budget["remaining"] < 0
 
+    # TODO: Fix average_expense query
     def average_expense(self, year: int | None = None) -> dict | None:
         """Returns the average expense for a particular or all the years."""
 
-        query = """
-        SELECT ROUND(AVG(monthly_totals.total_spent), 2) AS overall_avg_monthly_spending
-        FROM (
-            SELECT 
-            strftime('%Y-%m', date) AS month_year,
-            SUM(expense) AS total_spent
-            FROM expenses
-            GROUP BY month_year
-        ) AS monthly_totals
-        WHERE 1=1
+        query = [
             """
+            SELECT AVG(total_spent) AS average_monthly_spending
+            FROM (
+                SELECT
+                    SUM(expense) AS total_spent
+                FROM expenses
+                WHERE 1=1
+            """
+        ]
         params = []
 
         if year is not None:
-            query += " AND CAST(substr(month_year, 1, 4) AS INTEGER) = ?"
+            query.append("AND YEAR(DATE) = %s")
             params.append(year)
+        query.append(
+            """
+                GROUP BY YEAR(DATE), MONTH(DATE)
+            ) AS monthly_total
+            """
+        )
 
-        conn = self.db.get_connection()
-        try:
-            rows = conn.execute(query, params).fetchone()
-            if rows and rows["overall_avg_monthly_spending"] is None:
-                return None
-            return dict(rows)
-        finally:
-            conn.close()
+        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
+            cursor.execute(" ".join(query), params)
+            result = cursor.fetchone()
+            return result if result else None
 
     def summary(self, year: int | None, month: int | None) -> dict:
         """Returns a comprehensive financial summary."""
 
-        conn = self.db.get_connection()
-        try:
-            cursor = conn.cursor()
+        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
             overall_query = "SELECT SUM(expense) AS total_spent, COUNT(*) AS total_transactions FROM expenses"
+            cursor.execute(overall_query)
+            overall = cursor.fetchone()
 
-            overall_query_res = cursor.execute(overall_query).fetchone()
-        finally:
-            conn.close()
+        total_spent = float(overall["total_spent"] or 0)
+        total_transactions = int(overall["total_transactions"] or 0)
 
-        total_spent = float(overall_query_res["total_spent"] or 0)
-        total_transactions = int(overall_query_res["total_transactions"] or 0)
-
-        average_spending_dict = self.average_expense(year=year)
-        overall_avg_monthly_spending = (
-            average_spending_dict.get("overall_avg_monthly_spending")
-            if average_spending_dict
-            else 0.0
-        )
-
+        average_spending_dict = self.average_expense(year=year) or {}
         categories = self.spending_by_category(year=year, month=month)
+
         top_category = categories[0]["category"] if categories else None
+        overall_avg_monthly_spending = average_spending_dict.get(
+            "overall_avg_monthly_spending", 0.0
+        )
 
         summary_data = {
             "total_spent_all_time": total_spent,
@@ -162,28 +151,31 @@ class ExpenseAnalytics:
             "overall_avg_monthly_spending": overall_avg_monthly_spending,
             "top_spending_category": top_category,
         }
+        if year is None or month is None:
+            return summary_data
 
-        if year is not None and month is not None:
-            budget_data = self.remaining_budget(year=year, month=month)
-            if budget_data is not None:
-                monthly_budget, monthly_spent, remaining = budget_data
-                is_over = remaining < 0
-            else:
-                monthly_budget = None
-                monthly_spent = 0.0
+        budget_data = self.remaining_budget(year=year, month=month)
 
-                months = self.monthly_spending(year=year)
-                if months:
-                    match = next((m for m in months if m["month"] == month), None)
-                    if match:
-                        monthly_spent = match["total_spent"]
-                remaining = None
-                is_over = None
+        if budget_data is not None:
+            monthly_budget, monthly_spent, remaining = budget_data
+            is_over = remaining < 0
+        else:
+            monthly_budget = None
+            remaining = None
+            is_over = None
+            monthly_spent = 0.0
 
-            summary_data["period"] = {"year": year, "month": month}
-            summary_data["monthly_spent"] = monthly_spent
-            summary_data["monthly_budget"] = monthly_budget
-            summary_data["remaining_budget"] = remaining
-            summary_data["is_over_budget"] = is_over
+            months = self.monthly_spending(year=year)
+
+            if months:
+                match = next((m for m in months if m["month"] == month), None)
+                monthly_spent = match["total_spent"] if match else 0.0
+
+        summary_data["year"] = year
+        summary_data["month"] = month
+        summary_data["monthly_spent"] = monthly_spent
+        summary_data["monthly_budget"] = monthly_budget
+        summary_data["remaining_budget"] = remaining
+        summary_data["is_over_budget"] = is_over
 
         return summary_data
