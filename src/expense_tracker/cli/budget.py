@@ -99,7 +99,7 @@ def list(
 
     db: DatabaseManager = ctx.obj["db"]
     console: Console = ctx.obj["console"]
-    budgets = db.get_all_budgets(year=year, month=month)
+    budgets = db.get_budgets(year=year, month=month)
 
     if not budgets:
         console.print("i [dim]No budgets found in the database.[/dim]")

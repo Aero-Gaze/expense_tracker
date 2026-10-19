@@ -166,7 +166,7 @@ def variance(
         console.print("[yellow]![/yellow] No budget was found.")
         raise typer.Exit()
 
-    remaining_budget = result[-1]
+    remaining_budget = result["remaining"]
     table = Table(
         title=f"Variance for [cyan]{target_year}/{target_month}[/cyan]", box=box.ROUNDED
     )

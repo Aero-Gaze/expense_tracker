@@ -1,6 +1,3 @@
-from pathlib import Path
-from typing import Annotated
-
 import typer
 from rich.console import Console
 
@@ -8,7 +5,7 @@ from expense_tracker.analysis import ExpenseAnalytics
 from expense_tracker.cli.analysis import app as analysis_app
 from expense_tracker.cli.budget import app as budget_app
 from expense_tracker.cli.expense import app as expense_app
-from expense_tracker.database import DB_FILE, SCHEMA_FILE, DatabaseManager
+from expense_tracker.database import DatabaseManager
 
 app = typer.Typer(
     name="expense-tracker",
@@ -24,12 +21,6 @@ app.add_typer(analysis_app, name="analysis", help="All commands related to analy
 @app.callback()
 def main(
     ctx: typer.Context,
-    db_file: Annotated[
-        Path, typer.Option("--db", "-d", help="Path of the SQLite database file.")
-    ] = DB_FILE,
-    schema_file: Annotated[
-        Path, typer.Option("--schema", "-s", help="Path of the Schema file.")
-    ] = SCHEMA_FILE,
 ):
     ctx.ensure_object(dict)
     ctx.obj["db"] = DatabaseManager()

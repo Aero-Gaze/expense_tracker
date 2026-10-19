@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from expense_tracker.database.Database import DatabaseManager
+from expense_tracker.database import DatabaseManager
 
 
 class ExpenseAnalytics:
