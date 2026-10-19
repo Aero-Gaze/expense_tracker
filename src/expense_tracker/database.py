@@ -1,11 +1,15 @@
-import mariadb
+from os import getenv
 
+import mariadb
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "",
-    "password": "",
-    "database": "project_db",
+    "host": getenv("DB_HOST", "localhost"),
+    "user": getenv("DB_USER"),
+    "password": getenv("DB_PASSWORD"),
+    "database": getenv("DB_NAME", "project_db"),
 }
 
 
