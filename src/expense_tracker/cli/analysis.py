@@ -4,6 +4,7 @@ from typing import Annotated
 import typer
 from rich import box
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from expense_tracker.analysis import ExpenseAnalytics
@@ -68,7 +69,7 @@ def category(
     ]
 
     for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)
+        table.add_column(column_name, style=style, justify=justify)  # type: ignore
 
     for dict_row in result:
         rows = [str(row) for row in dict_row.values()]
@@ -118,7 +119,7 @@ def monthly(
     ]
 
     for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)
+        table.add_column(column_name, style=style, justify=justify)  # type: ignore
 
     for dict_row in result:
         rows = [str(row) for row in dict_row.values()]
@@ -261,7 +262,7 @@ def average(
     result = analysis.average_expense(year=year)
 
     if year:
-        title = f"Average Monthly Spending For [cyan]{year}[/cyan]"
+        title = f"Average Monthly Spending for Year [cyan]{year}[/cyan]"
     else:
         title = "Average Monthly Spending"
 
@@ -273,12 +274,9 @@ def average(
     table.add_column(
         "overall Average Spending", style="green", justify="center", width=30
     )
-    table.add_row(str(result["overall_avg_monthly_spending"]))
+    table.add_row(str(result))
 
     console.print(table)
-
-
-# TODO: Fix summary display
 
 
 @app.command()
@@ -314,16 +312,21 @@ def summary(
 
     result = analysis.summary(year=year, month=month)
 
-    # if not result:
-    #     console.print("[yellow]![/yellow] No summary was found.")
-    #     raise typer.Exit()
-    # table = Table(title="Summary", box=box.ROUNDED)
-    # for column in result:
-    #     table.add_column(str(column), style="cyan")
-    #
-    # rows = [str(row) for row in result.values()]
-    # table.add_row(*rows)
-    # console.print(table)
+    if not result:
+        console.print("[yellow]![/yellow] No summary was found.")
+        raise typer.Exit()
+
+    content = "\n".join(
+        f"[bold cyan]{key.replace('_', ' ').title()}: [/bold cyan]{value}"
+        for key, value in result.items()
+    )
+    if year and month:
+        title = f"[bold]Expense Summary[/bold] for [cyan]{year}/{month}[/cyan]"
+    else:
+        title = "[bold]Expense Summary[/bold]"
+
+    panel = Panel(content, title=title)
+    console.print(panel)
 
 
 if __name__ == "__main__":

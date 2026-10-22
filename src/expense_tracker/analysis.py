@@ -168,8 +168,6 @@ class ExpenseAnalytics:
             match = next((m for m in months if m["month"] == month), None)
             monthly_spent = match["total_spent"] if match else 0.0
 
-        summary_data["year"] = year
-        summary_data["month"] = month
         summary_data["monthly_spent"] = monthly_spent
         summary_data["monthly_budget"] = monthly_budget
         summary_data["remaining_budget"] = remaining
