@@ -1,3 +1,4 @@
+from datetime import datetime
 from os import getenv
 
 import mariadb
@@ -61,7 +62,7 @@ class DatabaseManager:
         name: str,
         category: str,
         expense: float,
-        date: str,
+        date: datetime,
         description: str | None = None,
     ) -> int | None:
         """Inserts an expense and return its ID."""
@@ -71,7 +72,7 @@ class DatabaseManager:
                 INSERT INTO expenses(name, category, description, expense, date) 
                 VALUES (%s, %s, %s, %s, %s)
                 """,
-                (name, category, description, expense, date),
+                (name, category, description, expense, date.date()),
             )
             conn.commit()
             return cursor.lastrowid
