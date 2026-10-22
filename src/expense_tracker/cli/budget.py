@@ -107,15 +107,15 @@ def list(
 
     table = Table(title="Budgets", box=box.ROUNDED)
 
-    # Format: (column_name, style)
+    # Format: (column_name, style, justify)
     columns = [
-        ("ID", "cyan"),
-        ("Year", "cyan"),
-        ("Month", "cyan"),
-        ("Amount", "green"),
+        ("ID", "cyan", "left"),
+        ("Year", "cyan", "left"),
+        ("Month", "cyan", "left"),
+        ("Amount", "green", "right"),
     ]
-    for column_name, style in columns:
-        table.add_column(column_name, style=style)
+    for column_name, style, justify in columns:
+        table.add_column(column_name, style=style, justify=justify)  # type: ignore
 
     for dict_row in budgets:
         rows = [str(row) for row in dict_row.values()]
