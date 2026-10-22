@@ -8,7 +8,7 @@ from rich.table import Table
 
 from expense_tracker.database import DatabaseManager
 
-app = typer.Typer()
+app = typer.Typer(no_args_is_help=True)
 
 
 def _resolve_target_date(year: int | None, month: int | None) -> tuple[int, int]:

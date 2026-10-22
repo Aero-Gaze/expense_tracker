@@ -5,7 +5,7 @@ import typer
 
 from expense_tracker.database import DatabaseManager
 
-app = typer.Typer()
+app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()

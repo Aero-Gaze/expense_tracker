@@ -11,6 +11,7 @@ app = typer.Typer(
     name="expense-tracker",
     help="A simple expense tracker using python",
     add_completion=False,
+    no_args_is_help=True,
 )
 
 app.add_typer(budget_app, name="budget", help="All commands related to budget.")
