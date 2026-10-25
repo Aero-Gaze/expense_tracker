@@ -58,9 +58,10 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    # ---------------
-    # Expense Methods
-    # ---------------
+
+class ExpenseManager(DatabaseManager):
+    """Handles all expense-related database operations with explicit connection cleanup."""
+
     def add_expense(
         self,
         name: str,
@@ -139,9 +140,9 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    # --------------
-    # Budget Methods
-    # --------------
+
+class BudgetManager(DatabaseManager):
+    """Handles all budget-related database operations with explicit connection cleanup."""
 
     def set_budget(self, year: int, month: int, amount: float) -> bool:
         """Create or update a budget for the given month"""
