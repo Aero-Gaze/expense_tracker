@@ -71,16 +71,20 @@ class ExpenseManager(DatabaseManager):
         description: str | None = None,
     ) -> int | None:
         """Inserts an expense and return its ID."""
-        with self.get_connection() as conn, conn.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO expenses(name, category, description, expense, date) 
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (name, category, description, expense, date.date()),
-            )
-            conn.commit()
-            return cursor.lastrowid
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO expenses(name, category, description, expense, date) 
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (name, category, description, expense, date.date()),
+                )
+                conn.commit()
+                return cursor.lastrowid
+        finally:
+            conn.close()
 
     def get_expense(self, expense_id: int) -> dict[str, Any] | None:
         """Returns one expense or None if it doesn't exist."""
@@ -148,7 +152,7 @@ class BudgetManager(DatabaseManager):
         """Create or update a budget for the given month"""
         conn = self.get_connection()
         try:
-            with self.get_connection() as conn, conn.cursor() as cursor:
+            with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO budgets(year, month, amount)
@@ -191,7 +195,7 @@ class BudgetManager(DatabaseManager):
         """Deletes a month's budget for a particular year. Return False if not found."""
         conn = self.get_connection()
         try:
-            with self.get_connection() as conn, conn.cursor() as cursor:
+            with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     DELETE FROM budgets WHERE year = %s AND month = %s
