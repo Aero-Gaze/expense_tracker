@@ -6,7 +6,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from expense_tracker.database import DatabaseManager
+from expense_tracker.database import ExpenseManager
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -45,7 +45,7 @@ def add(
     target_date = date if date is not None else datetime.now()
     fixed_category = category.strip().title()
 
-    db: DatabaseManager = ctx.obj["db"]
+    db: ExpenseManager = ctx.obj["expense"]
     console: Console = ctx.obj["console"]
 
     row_id = db.add_expense(
@@ -94,7 +94,7 @@ def list(
     if month and (not year):
         raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    db: DatabaseManager = ctx.obj["db"]
+    db: ExpenseManager = ctx.obj["expense"]
     console: Console = ctx.obj["console"]
 
     result = db.get_all_expenses(year=year, month=month)
@@ -140,7 +140,7 @@ def list_by_id(
     ],
 ):
     """ "Display detailed information for a single expense by its unique ID."""
-    db: DatabaseManager = ctx.obj["db"]
+    db: ExpenseManager = ctx.obj["expense"]
     console: Console = ctx.obj["console"]
     result = db.get_expense(expense_id=expense_id)
 
@@ -178,7 +178,7 @@ def remove(
     ],
 ) -> None:
     """Permanently delete an expense record from the database by its ID."""
-    db: DatabaseManager = ctx.obj["db"]
+    db: ExpenseManager = ctx.obj["expense"]
     console: Console = ctx.obj["console"]
 
     result = db.delete_expense(expense_id=expense_id)

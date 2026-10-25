@@ -5,7 +5,7 @@ from expense_tracker.analysis import ExpenseAnalytics
 from expense_tracker.cli.analysis import app as analysis_app
 from expense_tracker.cli.budget import app as budget_app
 from expense_tracker.cli.expense import app as expense_app
-from expense_tracker.database import DatabaseManager
+from expense_tracker.database import BudgetManager, DatabaseManager, ExpenseManager
 
 app = typer.Typer(
     name="expense-tracker",
@@ -26,6 +26,8 @@ def main(
     ctx.ensure_object(dict)
     ctx.obj["db"] = DatabaseManager()
     ctx.obj["analysis"] = ExpenseAnalytics(ctx.obj["db"])
+    ctx.obj["expense"] = ExpenseManager()
+    ctx.obj["budget"] = BudgetManager()
     ctx.obj["console"] = Console()
 
 
