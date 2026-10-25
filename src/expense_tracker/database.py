@@ -23,7 +23,7 @@ class DatabaseManager:
     def __init__(self) -> None:
         self._init_db()
 
-    def get_connection(self) -> pymysql.Connection:
+    def get_connection(self) -> pymysql.Connection[pymysql.cursors.DictCursor]:
         return pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
 
     def _init_db(self) -> None:
