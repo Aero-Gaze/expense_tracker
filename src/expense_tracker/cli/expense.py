@@ -3,10 +3,9 @@ from typing import Annotated
 
 import typer
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
-from expense_tracker.database import ExpenseManager
+from expense_tracker.cli.app_state import AppState
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -33,21 +32,27 @@ def add(
     description: Annotated[
         str | None,
         typer.Option(
-            "--description", "-desc", help="optional detailed notes about the expense."
+            "--description", "-desc", help="Optional detailed notes about the expense."
         ),
     ] = None,
 ) -> None:
-    """Add a new expense record to database.
+    """Add a new expense to the database."""
 
-    Saves the expense name, category, amount, optional date and description.
-    If no date is provided, the current system date is used automatically.
-    """
-    target_date = date if date is not None else datetime.now()
+    # Use today's date if no date is provided
+    if date is None:
+        target_date = datetime.now()
+    else:
+        target_date = date
+
+    # Remove unnecessary spaces and capitalize the category
     fixed_category = category.strip().title()
 
-    db: ExpenseManager = ctx.obj["expense"]
-    console: Console = ctx.obj["console"]
+    state: AppState = ctx.obj
+    # Get the database and console
+    db = state.expense
+    console = state.console
 
+    # Add the expense to the database
     row_id = db.add_expense(
         name=name,
         category=fixed_category,
@@ -55,11 +60,17 @@ def add(
         date=target_date,
         description=description,
     )
+
+    # Check whether the expense was added
     if not row_id:
         console.print("[yellow]![/yellow] No expense was added.")
         raise typer.Exit()
+
+    # Display success message
     console.print(
-        f"[bold green]✓[/bold green] Expense of [cyan]{expense}[/cyan] was successfully added for [cyan]{target_date.date()}[/cyan] with ID [cyan]{row_id}[/cyan]"
+        f"[bold green]✓[/bold green] Expense of [cyan]{expense}[/cyan] "
+        f"was successfully added for [cyan]{target_date.date()}[/cyan] "
+        f"with ID [cyan]{row_id}[/cyan]"
     )
 
 
@@ -87,48 +98,59 @@ def list(
         ),
     ] = None,
 ) -> None:
-    """List all recorded expenses with optional year and month filters.
+    """Display all expenses with optional year and month filters."""
 
-    To filter by month, you must also specify the year using the --year option.
-    """
-    if month and (not year):
+    # Check whether a month was provided without a year
+    if month is not None and year is None:
         raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    db: ExpenseManager = ctx.obj["expense"]
-    console: Console = ctx.obj["console"]
+    state: AppState = ctx.obj
 
+    # Get the database and console
+    db = state.expense
+    console = state.console
+
+    # Get expenses from the database
     result = db.get_all_expenses(year=year, month=month)
 
+    # Check whether any expenses were found
     if not result:
         console.print("i [dim]No expenses found in the database.[/dim]")
         raise typer.Exit()
 
-    if year and month:
+    # Choose the table title
+    if year is not None and month is not None:
         title = f"Expenses for [cyan]{year}/{month:02d}[/cyan]"
-    elif year:
+
+    elif year is not None:
         title = f"Expenses for year [cyan]{year}[/cyan]"
+
     else:
         title = "Expenses"
 
+    # Create the Rich table
     table = Table(title=title, box=box.ROUNDED)
 
-    # Format: (column_name, style, justify)
-    columns = [
-        ("ID", "cyan", "left"),
-        ("Name", "cyan", "left"),
-        ("Category", "cyan", "left"),
-        ("Description", "cyan", "left"),
-        ("Expense", "green", "right"),
-        ("Date", "cyan", "left"),
-    ]
+    # Add table columns
+    table.add_column("ID", style="cyan", justify="left")
+    table.add_column("Name", style="cyan", justify="left")
+    table.add_column("Category", style="cyan", justify="left")
+    table.add_column("Description", style="cyan", justify="left")
+    table.add_column("Expense", style="green", justify="right")
+    table.add_column("Date", style="cyan", justify="left")
 
-    for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)  # type: ignore
+    # Add expenses to the table
+    for expense_data in result:
+        expense_id = str(expense_data["id"])
+        name = str(expense_data["name"])
+        category = str(expense_data["category"])
+        description = str(expense_data["description"])
+        amount = str(expense_data["expense"])
+        date = str(expense_data["date"])
 
-    for dict_row in result:
-        rows = [str(val) for val in dict_row.values()]
-        table.add_row(*rows)
+        table.add_row(expense_id, name, category, description, amount, date)
 
+    # Display the table
     console.print(table)
 
 
@@ -138,35 +160,48 @@ def list_by_id(
     expense_id: Annotated[
         int, typer.Argument(help="The unique ID of the expense to view.")
     ],
-):
-    """ "Display detailed information for a single expense by its unique ID."""
-    db: ExpenseManager = ctx.obj["expense"]
-    console: Console = ctx.obj["console"]
+) -> None:
+    """Display information about a particular expense."""
+
+    state: AppState = ctx.obj
+
+    # Get the database and console
+    db = state.expense
+    console = state.console
+
+    # Get the expense using its ID
     result = db.get_expense(expense_id=expense_id)
 
-    if not result:
+    # Check whether the expense exists
+    if result is None:
         console.print(
             f"[yellow]![/yellow] No expense found with ID [cyan]{expense_id}[/cyan]"
         )
         raise typer.Exit()
 
+    # Create the Rich table
     table = Table(box=box.ROUNDED)
 
-    # Format: (column_name, style, justify)
-    columns = [
-        ("ID", "cyan", "left"),
-        ("Name", "cyan", "left"),
-        ("Category", "cyan", "left"),
-        ("Description", "cyan", "left"),
-        ("Expense", "green", "right"),
-        ("Date", "cyan", "left"),
-    ]
-    for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)  # type: ignore
+    # Add table columns
+    table.add_column("ID", style="cyan", justify="left")
+    table.add_column("Name", style="cyan", justify="left")
+    table.add_column("Category", style="cyan", justify="left")
+    table.add_column("Description", style="cyan", justify="left")
+    table.add_column("Expense", style="green", justify="right")
+    table.add_column("Date", style="cyan", justify="left")
 
-    rows = [str(val) for val in result.values()]
-    table.add_row(*rows)
+    # Get the expense details
+    expense_id_r = str(result["id"])
+    name = str(result["name"])
+    category = str(result["category"])
+    description = str(result["description"])
+    amount = str(result["expense"])
+    date = str(result["date"])
 
+    # Add the expense to the table
+    table.add_row(expense_id_r, name, category, description, amount, date)
+
+    # Display the table
     console.print(table)
 
 
@@ -177,19 +212,29 @@ def remove(
         int, typer.Argument(help="The unique ID of the expense to remove.", min=0)
     ],
 ) -> None:
-    """Permanently delete an expense record from the database by its ID."""
-    db: ExpenseManager = ctx.obj["expense"]
-    console: Console = ctx.obj["console"]
+    """Delete an expense from the database using its ID."""
 
+    state: AppState = ctx.obj
+
+    # Get the database and console
+    db = state.expense
+    console = state.console
+
+    # Delete the expense
     result = db.delete_expense(expense_id=expense_id)
 
-    if not result:
+    # Check whether the expense was deleted
+    if result is False:
         console.print(
-            f"[yellow]![/yellow] No expense found to remove for ID [cyan]{expense_id}[/cyan]"
+            f"[yellow]![/yellow] No expense found to remove "
+            f"for ID [cyan]{expense_id}[/cyan]"
         )
         raise typer.Exit()
+
+    # Display success message
     console.print(
-        f"[red]-[/red] Expense was successfully removed for ID [cyan]{expense_id}[/cyan]"
+        f"[red]-[/red] Expense was successfully removed "
+        f"for ID [cyan]{expense_id}[/cyan]"
     )
 
 
