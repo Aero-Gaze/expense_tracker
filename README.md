@@ -16,8 +16,8 @@ A simple command-line expense tracker built with Python to record expenses, mana
 
 - **Language:** Python 3.14+
 - **CLI Framework:** Typer
-- **Database:** MariaDB
-- **Database Connector:** MariaDB Connector/Python
+- **Database:** MariaDB/MySQL
+- **Database Connector:** PyMySQL
 - **Environment Configuration:** python-dotenv
 - **Terminal Formatting:** Rich
 - **Package Management:** uv

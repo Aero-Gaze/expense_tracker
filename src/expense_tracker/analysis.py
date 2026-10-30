@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Any
 
 from expense_tracker.database import DatabaseManager
 
@@ -9,7 +10,7 @@ class ExpenseAnalytics:
 
     def spending_by_category(
         self, year: int | None = None, month: int | None = None
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Returns category wise spending and count, optionally filtered by year and/or month."""
         query = [
             """
@@ -30,11 +31,15 @@ class ExpenseAnalytics:
 
         query.append("GROUP BY category ORDER BY total_spent DESC")
 
-        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
-            cursor.execute(" ".join(query), tuple(params))
-            return cursor.fetchall()
+        conn = self.db.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(" ".join(query), tuple(params))
+                return cursor.fetchall()  # type: ignore
+        finally:
+            conn.close()
 
-    def monthly_spending(self, year: int | None = None) -> list[dict]:
+    def monthly_spending(self, year: int | None = None) -> list[dict[str, Any]]:
         """Returns total monthly spending per year, optionally filtered by year."""
         query = [
             """
@@ -54,9 +59,13 @@ class ExpenseAnalytics:
 
         query.append("GROUP BY year, month ORDER BY year DESC, month")
 
-        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
-            cursor.execute(" ".join(query), tuple(params))
-            return cursor.fetchall()
+        conn = self.db.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(" ".join(query), tuple(params))
+                return cursor.fetchall()  # type: ignore
+        finally:
+            conn.close()
 
     def remaining_budget(self, year: int, month: int) -> dict[str, Decimal] | None:
         """Returns (total_budget, total_spent, total_budget - total_spent), or None if no budget exists."""
@@ -72,9 +81,13 @@ class ExpenseAnalytics:
         GROUP BY B.amount
         """
 
-        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
-            cursor.execute(query, (year, month))
-            result = cursor.fetchone()
+        conn = self.db.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (year, month))
+                result = cursor.fetchone()
+        finally:
+            conn.close()
 
         if result is None:
             return None
@@ -120,18 +133,31 @@ class ExpenseAnalytics:
             """
         )
 
-        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
-            cursor.execute(" ".join(query), params)
-            result = cursor.fetchone()
-            return result["average_monthly_spending"] if result else None
+        conn = self.db.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(" ".join(query), params)
+                result = cursor.fetchone()
+                return result["average_monthly_spending"] if result else None
+        finally:
+            conn.close()
 
-    def summary(self, year: int | None = None, month: int | None = None) -> dict:
+    def summary(
+        self, year: int | None = None, month: int | None = None
+    ) -> dict[str, Any] | None:
         """Returns a comprehensive financial summary."""
 
-        with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cursor:
-            overall_query = "SELECT SUM(expense) AS total_spent, COUNT(*) AS total_transactions FROM expenses"
-            cursor.execute(overall_query)
-            overall = cursor.fetchone()
+        conn = self.db.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                overall_query = "SELECT SUM(expense) AS total_spent, COUNT(*) AS total_transactions FROM expenses"
+                cursor.execute(overall_query)
+                overall = cursor.fetchone()
+        finally:
+            conn.close()
+
+        if overall is None:
+            return None
 
         total_spent = float(overall["total_spent"] or Decimal(0))
         total_transactions = int(overall["total_transactions"] or Decimal(0))

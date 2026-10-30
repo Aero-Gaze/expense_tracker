@@ -6,7 +6,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from expense_tracker.database import DatabaseManager
+from expense_tracker.database import BudgetManager
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -55,7 +55,7 @@ def set(
 
     target_year, target_month = _resolve_target_date(year=year, month=month)
 
-    db: DatabaseManager = ctx.obj["db"]
+    db: BudgetManager = ctx.obj["budget"]
     console: Console = ctx.obj["console"]
 
     result = db.set_budget(year=target_year, month=target_month, amount=budget)
@@ -97,7 +97,7 @@ def list(
     Optionally filter results by year and/or month.
     """
 
-    db: DatabaseManager = ctx.obj["db"]
+    db: BudgetManager = ctx.obj["budget"]
     console: Console = ctx.obj["console"]
     budgets = db.get_budgets(year=year, month=month)
 
@@ -156,7 +156,7 @@ def remove(
 
     target_year, target_month = _resolve_target_date(year=year, month=month)
 
-    db: DatabaseManager = ctx.obj["db"]
+    db: BudgetManager = ctx.obj["budget"]
     console: Console = ctx.obj["console"]
 
     result = db.delete_budget(year=target_year, month=target_month)
