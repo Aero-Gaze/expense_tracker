@@ -5,8 +5,10 @@ from typing import Any
 import pymysql
 from dotenv import load_dotenv
 
+# Load environment variables from the .env file
 load_dotenv()
 
+# Database connection details
 DB_CONFIG = {
     "host": getenv("DB_HOST", "localhost"),
     "user": getenv("DB_USER"),
@@ -16,19 +18,25 @@ DB_CONFIG = {
 
 
 class DatabaseManager:
-    """
-    A database layer to access the database.
-    """
+    """Handles the database connection and table creation."""
 
     def __init__(self) -> None:
         self._init_db()
 
     def get_connection(self) -> pymysql.Connection[pymysql.cursors.DictCursor]:
-        return pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
+        """Creates and returns a database connection."""
+
+        connection = pymysql.connect(
+            **DB_CONFIG, cursorclass=pymysql.cursors.DictCursor
+        )
+
+        return connection
 
     def _init_db(self) -> None:
-        create_queries: list[str] = [
-            """
+        """Creates the expenses and budgets tables if they do not exist."""
+
+        # SQL query to create the expenses table
+        create_expenses_table = """
             CREATE TABLE IF NOT EXISTS expenses (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
@@ -37,30 +45,38 @@ class DatabaseManager:
                 expense DECIMAL(10, 2) NOT NULL CHECK (expense >= 0),
                 date DATE NOT NULL
             )
-            """,
-            """
+        """
+
+        # SQL query to create the budgets table
+        create_budgets_table = """
             CREATE TABLE IF NOT EXISTS budgets (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 year INT NOT NULL CHECK (year BETWEEN 1 AND 9999),
-                month INT NOT NULL CHECK (month BETWEEN 1 and 12),
+                month INT NOT NULL CHECK (month BETWEEN 1 AND 12),
                 amount DECIMAL(10, 2) NOT NULL CHECK (amount >= 0),
-
                 UNIQUE(year, month)
             )
-            """,
-        ]
-        conn = self.get_connection()
+        """
+
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                for query in create_queries:
-                    cursor.execute(query)
-                conn.commit()
+            with connection.cursor() as cursor:
+                # Create the expenses table
+                cursor.execute(create_expenses_table)
+
+                # Create the budgets table
+                cursor.execute(create_budgets_table)
+
+                # Save the changes
+                connection.commit()
+
         finally:
-            conn.close()
+            connection.close()
 
 
 class ExpenseManager(DatabaseManager):
-    """Handles all expense-related database operations with explicit connection cleanup."""
+    """Handles all expense-related database operations."""
 
     def add_expense(
         self,
@@ -70,155 +86,221 @@ class ExpenseManager(DatabaseManager):
         date: datetime,
         description: str | None = None,
     ) -> int | None:
-        """Inserts an expense and return its ID."""
-        conn = self.get_connection()
+        """Adds a new expense and returns its ID."""
+
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO expenses(name, category, description, expense, date) 
+            with connection.cursor() as cursor:
+                query = """
+                    INSERT INTO expenses
+                    (name, category, description, expense, date)
                     VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (name, category, description, expense, date.date()),
-                )
-                conn.commit()
-                return cursor.lastrowid
+                """
+
+                values = (name, category, description, expense, date.date())
+
+                cursor.execute(query, values)
+
+                connection.commit()
+
+                expense_id = cursor.lastrowid
+
+                return expense_id
+
         finally:
-            conn.close()
+            connection.close()
 
     def get_expense(self, expense_id: int) -> dict[str, Any] | None:
-        """Returns one expense or None if it doesn't exist."""
+        """Returns one expense using its ID."""
 
-        conn = self.get_connection()
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT * FROM expenses WHERE id = %s
-                    """,
-                    (expense_id,),
-                )
-                row = cursor.fetchone()
-                return row if row else None  # type: ignore
+            with connection.cursor() as cursor:
+                query = "SELECT * FROM expenses WHERE id = %s"
+
+                cursor.execute(query, (expense_id,))
+
+                expense = cursor.fetchone()
+
+                if expense is None:
+                    return None
+
+                return expense  # type: ignore
+
         finally:
-            conn.close()
+            connection.close()
 
     def get_all_expenses(
         self, year: int | None = None, month: int | None = None
     ) -> list[dict[str, Any]] | None:
-        """List all expenses, takes year and month as parameter(optional)."""
-        query = ["SELECT * FROM expenses WHERE 1=1"]
+        """Returns all expenses, optionally filtered by year and month."""
+
+        query = "SELECT * FROM expenses WHERE 1=1"
+
         params = []
 
+        # Add year filter if a year is provided
         if year is not None:
-            query.append("AND YEAR(date) = %s")
+            query += " AND YEAR(date) = %s"
             params.append(year)
+
+        # Add month filter if a month is provided
         if month is not None:
-            query.append("AND MONTH(date) = %s")
+            query += " AND MONTH(date) = %s"
             params.append(month)
 
-        query.append("ORDER BY date DESC")
+        # Show newest expenses first
+        query += " ORDER BY date DESC"
 
-        conn = self.get_connection()
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(" ".join(query), params)
-                rows = cursor.fetchall()
-                return rows if rows else None  # type: ignore
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+
+                expenses = cursor.fetchall()
+
+                if len(expenses) == 0:
+                    return None
+
+                return expenses  # type: ignore
+
         finally:
-            conn.close()
+            connection.close()
 
     def delete_expense(self, expense_id: int) -> bool:
-        """Deletes an expense by id. Returns False if not found"""
-        conn = self.get_connection()
+        """Deletes an expense and returns True if it was found."""
+
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    DELETE FROM expenses WHERE id = %s
-                    """,
-                    (expense_id,),
-                )
-                conn.commit()
-                return cursor.rowcount > 0
+            with connection.cursor() as cursor:
+                query = "DELETE FROM expenses WHERE id = %s"
+
+                cursor.execute(query, (expense_id,))
+
+                connection.commit()
+
+                if cursor.rowcount > 0:
+                    return True
+                else:
+                    return False
+
         finally:
-            conn.close()
+            connection.close()
 
 
 class BudgetManager(DatabaseManager):
-    """Handles all budget-related database operations with explicit connection cleanup."""
+    """Handles all budget-related database operations."""
 
     def set_budget(self, year: int, month: int, amount: float) -> bool:
-        """Create or update a budget for the given month"""
-        conn = self.get_connection()
+        """Creates a new budget or updates an existing one."""
+
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO budgets(year, month, amount)
+            with connection.cursor() as cursor:
+                query = """
+                    INSERT INTO budgets (year, month, amount)
                     VALUES (%s, %s, %s)
                     ON DUPLICATE KEY UPDATE amount = VALUES(amount)
-                    """,
-                    (year, month, amount),
-                )
-                conn.commit()
-                return cursor.rowcount > 0
+                """
+
+                values = (year, month, amount)
+
+                cursor.execute(query, values)
+
+                connection.commit()
+
+                if cursor.rowcount > 0:
+                    return True
+                else:
+                    return False
+
         finally:
-            conn.close()
+            connection.close()
 
     def get_budgets(
         self, year: int | None = None, month: int | None = None
     ) -> list[dict[str, Any]] | None:
-        """List all budgets, in chronological order with optional filtering."""
-        query = ["SELECT * FROM budgets WHERE 1=1"]
+        """Returns all budgets, optionally filtered by year and month."""
+
+        query = "SELECT * FROM budgets WHERE 1=1"
+
         params = []
 
+        # Add year filter if provided
         if year is not None:
-            query.append("AND year = %s")
+            query += " AND year = %s"
             params.append(year)
+
+        # Add month filter if provided
         if month is not None:
-            query.append("AND month = %s")
+            query += " AND month = %s"
             params.append(month)
 
-        query.append("ORDER BY year, month")
+        # Arrange budgets by year and month
+        query += " ORDER BY year, month"
 
-        conn = self.get_connection()
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(" ".join(query), params)
-                rows = cursor.fetchall()
-                return rows if rows else None  # type: ignore
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+
+                budgets = cursor.fetchall()
+
+                if len(budgets) == 0:
+                    return None
+
+                return budgets  # type: ignore
+
         finally:
-            conn.close()
+            connection.close()
 
     def delete_budget(self, year: int, month: int) -> bool:
-        """Deletes a month's budget for a particular year. Return False if not found."""
-        conn = self.get_connection()
+        """Deletes a budget using its year and month."""
+
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    DELETE FROM budgets WHERE year = %s AND month = %s
-                    """,
-                    (year, month),
-                )
-                conn.commit()
-                return cursor.rowcount > 0
+            with connection.cursor() as cursor:
+                query = """
+                    DELETE FROM budgets
+                    WHERE year = %s AND month = %s
+                """
+
+                cursor.execute(query, (year, month))
+
+                connection.commit()
+
+                if cursor.rowcount > 0:
+                    return True
+                else:
+                    return False
+
         finally:
-            conn.close()
+            connection.close()
 
     def delete_budget_by_id(self, budget_id: int) -> bool:
-        """Deletes a budget by id. Returns False if not found"""
-        conn = self.get_connection()
+        """Deletes a budget using its ID."""
+
+        connection = self.get_connection()
+
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    DELETE FROM budgets WHERE id = %s
-                 """,
-                    (budget_id,),
-                )
-                conn.commit()
-                return cursor.rowcount > 0
+            with connection.cursor() as cursor:
+                query = "DELETE FROM budgets WHERE id = %s"
+
+                cursor.execute(query, (budget_id,))
+
+                connection.commit()
+
+                if cursor.rowcount > 0:
+                    return True
+                else:
+                    return False
+
         finally:
-            conn.close()
+            connection.close()
