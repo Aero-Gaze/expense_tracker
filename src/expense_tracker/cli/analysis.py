@@ -3,24 +3,40 @@ from typing import Annotated
 
 import typer
 from rich import box
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from expense_tracker.analysis import ExpenseAnalytics
+from expense_tracker.cli.app_state import AppState
 
 app = typer.Typer(no_args_is_help=True)
 
 
 def _resolve_target_date(year: int | None, month: int | None) -> tuple[int, int]:
-    """Validate that year and month are provided together, defaulting to today."""
-    if (year is None) != (month is None):
+    """Gets the year and month. Uses the current date if neither is provided."""
+
+    # Check whether both year and month are provided
+    if year is None and month is not None:
         raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    target_year = year if year is not None else datetime.now().year
-    target_month = month if month is not None else datetime.now().month
+    if month is None and year is not None:
+        raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    return (target_year, target_month)
+    # Get the current date
+    today = datetime.now()
+
+    # Use the current year if no year is provided
+    if year is None:
+        target_year = today.year
+    else:
+        target_year = year
+
+    # Use the current month if no month is provided
+    if month is None:
+        target_month = today.month
+    else:
+        target_month = month
+
+    return target_year, target_month
 
 
 @app.command()
@@ -47,33 +63,39 @@ def category(
         ),
     ] = None,
 ) -> None:
-    """Lists category-wise spending with transaction counts.
+    """Display spending for each category."""
 
-    Optionally filter results by year and/or month.
-    """
+    state: AppState = ctx.obj
 
-    analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    console: Console = ctx.obj["console"]
+    # Get the analysis object and console
+    analysis = state.analysis
+    console = state.console
+
+    # Get category-wise spending
     result = analysis.spending_by_category(year=year, month=month)
+
+    # Check whether any expenses were found
     if not result:
         console.print("[yellow]![/yellow] No expenses found to analyse.")
         raise typer.Exit()
 
+    # Create a Rich table
     table = Table(title="Category Wise Spending", box=box.ROUNDED)
 
-    # Format: (column_name, style, justify)
-    columns = [
-        ("Category", "cyan", "left"),
-        ("Total Spent", "green", "right"),
-        ("Count", "cyan", "right"),  # Internal column_name: transaction_count
-    ]
+    # Add table columns
+    table.add_column("Category", style="cyan", justify="left")
+    table.add_column("Total Spent", style="green", justify="right")
+    table.add_column("Count", style="cyan", justify="right")
 
-    for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)  # type: ignore
+    # Add category information to the table
+    for category_data in result:
+        category_name = str(category_data["category"])
+        total_spent = str(category_data["total_spent"])
+        transaction_count = str(category_data["transaction_count"])
 
-    for dict_row in result:
-        rows = [str(row) for row in dict_row.values()]
-        table.add_row(*rows)
+        table.add_row(category_name, total_spent, transaction_count)
+
+    # Display the table
     console.print(table)
 
 
@@ -90,41 +112,47 @@ def monthly(
         ),
     ] = None,
 ) -> None:
-    """Lists total monthly spending.
+    """Display total spending for each month."""
 
-    Optionally filter results by year.
-    """
+    state: AppState = ctx.obj
 
-    analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    console: Console = ctx.obj["console"]
+    # Get the analysis object and console
+    analysis = state.analysis
+    console = state.console
+
+    # Get monthly spending
     result = analysis.monthly_spending(year=year)
 
+    # Check whether any expenses were found
     if not result:
-        if not year:
+        if year is None:
             console.print("[yellow]![/yellow] No expenses to analyse.")
         else:
             console.print(
                 f"[yellow]![/yellow] No expense to analyse for [cyan]{year}[/cyan]"
             )
+
         raise typer.Exit()
 
+    # Create a Rich table
     table = Table(title="Month wise spending", box=box.ROUNDED)
 
-    # Format: (column_name, style, justify)
-    columns = [
-        ("Year", "cyan", "center"),
-        ("Month", "cyan", "center"),
-        ("Total Spent", "green", "right"),
-        ("Count", "cyan", "right"),
-    ]
+    # Add table columns
+    table.add_column("Year", style="cyan", justify="center")
+    table.add_column("Month", style="cyan", justify="center")
+    table.add_column("Total Spent", style="green", justify="right")
+    table.add_column("Count", style="cyan", justify="right")
 
-    for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)  # type: ignore
+    # Add monthly spending information
+    for month_data in result:
+        spending_year = str(month_data["year"])
+        spending_month = str(month_data["month"])
+        total_spent = str(month_data["total_spent"])
+        transaction_count = str(month_data["transaction_count"])
 
-    for dict_row in result:
-        rows = [str(row) for row in dict_row.values()]
-        table.add_row(*rows)
+        table.add_row(spending_year, spending_month, total_spent, transaction_count)
 
+    # Display the table
     console.print(table)
 
 
@@ -152,35 +180,49 @@ def variance(
         ),
     ] = None,
 ) -> None:
-    """Displays the remaining budget for a specific month and year.
+    """Display the remaining budget for a particular month."""
 
-    Defaults to the current month and year if neither is provided. Both --year
-    and --month must be specified together for filtering.
-    """
-    target_year, target_month = _resolve_target_date(year=year, month=month)
+    # Get the year and month
+    target_year, target_month = _resolve_target_date(year, month)
 
-    analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    console: Console = ctx.obj["console"]
+    state: AppState = ctx.obj
 
+    # Get the analysis object and console
+    analysis = state.analysis
+    console = state.console
+
+    # Get the remaining budget
     result = analysis.remaining_budget(year=target_year, month=target_month)
-    if not result:
+
+    # Check whether a budget exists
+    if result is None:
         console.print("[yellow]![/yellow] No budget was found.")
         raise typer.Exit()
 
+    # Get the remaining amount
     remaining_budget = result["remaining"]
+
+    # Create the table
     table = Table(
         title=f"Variance for [cyan]{target_year}/{target_month}[/cyan]", box=box.ROUNDED
     )
+
+    # Choose a colour based on the remaining budget
     if remaining_budget > 0:
         style = "green"
+
     elif remaining_budget == 0:
         style = "yellow"
+
     else:
         style = "red"
 
+    # Add the remaining budget to the table
     table.add_column("Remaining Budget", style=style, justify="center")
+
     table.add_row(str(remaining_budget))
 
+    # Display the table
     console.print(table)
 
 
@@ -208,35 +250,43 @@ def over_budget(
         ),
     ] = None,
 ) -> None:
-    """Check if spending exceeded the budget for a given period.
+    """Check whether spending exceeded the budget."""
 
-    Return True if over budget, otherwise False, or None if no budget is found.
-    Defaults to the current month and year if neither is provided. Both --year
-    and --month must be specified together if filtering manually.
-    """
+    # Get the year and month
+    target_year, target_month = _resolve_target_date(year, month)
 
-    target_year, target_month = _resolve_target_date(year=year, month=month)
-    analysis: ExpenseAnalytics = ctx.obj["analysis"]
+    state: AppState = ctx.obj
 
+    # Get the analysis object and console
+    analysis = state.analysis
+    console = state.console
+
+    # Check whether the spending is over budget
     result = analysis.is_over_budget(year=target_year, month=target_month)
-    console: Console = ctx.obj["console"]
 
+    # Check whether a budget exists
     if result is None:
         console.print("[yellow]![/yellow] No budget was found.")
         raise typer.Exit()
 
+    # Create the table
     table = Table(
         title=f"Over Budget for [cyan]{target_year}/{target_month}[/cyan]",
         box=box.ROUNDED,
     )
-    if result:
+
+    # Choose a colour based on the result
+    if result is True:
         style = "red"
     else:
         style = "green"
 
+    # Add the result to the table
     table.add_column("Over Budget ?", style=style, justify="center", width=20)
+
     table.add_row(str(result))
 
+    # Display the table
     console.print(table)
 
 
@@ -253,29 +303,38 @@ def average(
         ),
     ] = None,
 ) -> None:
-    """List average spending across all recorded months and years.
+    """Display average monthly spending."""
 
-    Optionally filter results by year.
-    """
-    analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    console: Console = ctx.obj["console"]
+    state: AppState = ctx.obj
+
+    # Get the analysis object and console
+    analysis = state.analysis
+    console = state.console
+
+    # Get average monthly spending
     result = analysis.average_expense(year=year)
 
+    # Choose the table title
     if year:
         title = f"Average Monthly Spending for Year [cyan]{year}[/cyan]"
     else:
         title = "Average Monthly Spending"
 
+    # Check whether an average was found
     if not result:
         console.print("[yellow]![/yellow] No average expense was found.")
         raise typer.Exit()
 
+    # Create the table
     table = Table(title=title, box=box.ROUNDED)
+
     table.add_column(
         "overall Average Spending", style="green", justify="center", width=30
     )
+
     table.add_row(str(result))
 
+    # Display the table
     console.print(table)
 
 
@@ -303,29 +362,52 @@ def summary(
         ),
     ] = None,
 ) -> None:
-    """Display overall financial summary."""
-    if (year is None) != (month is None):
+    """Display the overall financial summary."""
+
+    # Check whether both year and month are provided
+    if year is None and month is not None:
         raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    analysis: ExpenseAnalytics = ctx.obj["analysis"]
-    console: Console = ctx.obj["console"]
+    if month is None and year is not None:
+        raise typer.BadParameter("Both --year and --month must be provided together.")
 
+    state: AppState = ctx.obj
+
+    # Get the analysis object and console
+    analysis = state.analysis
+    console = state.console
+
+    # Get the financial summary
     result = analysis.summary(year=year, month=month)
 
-    if not result:
+    # Check whether a summary was found
+    if result is None:
         console.print("[yellow]![/yellow] No summary was found.")
         raise typer.Exit()
 
-    content = "\n".join(
-        f"[bold cyan]{key.replace('_', ' ').title()}: [/bold cyan]{value}"
-        for key, value in result.items()
-    )
-    if year and month:
+    # Convert the summary information into readable text
+    content = ""
+
+    for key, value in result.items():
+        # Replace underscores with spaces
+        readable_key = key.replace("_", " ")
+
+        # Capitalize the words
+        readable_key = readable_key.title()
+
+        # Add the information to the content
+        content += f"[bold cyan]{readable_key}: [/bold cyan]{value}\n"
+
+    # Choose the panel title
+    if year is not None and month is not None:
         title = f"[bold]Expense Summary[/bold] for [cyan]{year}/{month}[/cyan]"
     else:
         title = "[bold]Expense Summary[/bold]"
 
+    # Create the Rich panel
     panel = Panel(content, title=title)
+
+    # Display the panel
     console.print(panel)
 
 

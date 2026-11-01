@@ -3,23 +3,36 @@ from typing import Annotated
 
 import typer
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
-from expense_tracker.database import BudgetManager
+from expense_tracker.cli.app_state import AppState
 
 app = typer.Typer(no_args_is_help=True)
 
 
 def _resolve_target_date(year: int | None, month: int | None) -> tuple[int, int]:
-    """Validate that year and month are provided together, defaulting to today."""
-    if (year is None) != (month is None):
+    """Gets the year and month. Uses the current date if neither is provided."""
+
+    # Check whether both year and month are provided
+    if year is None and month is not None:
         raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    target_year = year if year is not None else datetime.now().year
-    target_month = month if month is not None else datetime.now().month
+    if month is None and year is not None:
+        raise typer.BadParameter("Both --year and --month must be provided together.")
 
-    return (target_year, target_month)
+    # Use the current year if no year is provided
+    if year is None:
+        target_year = datetime.now().year
+    else:
+        target_year = year
+
+    # Use the current month if no month is provided
+    if month is None:
+        target_month = datetime.now().month
+    else:
+        target_month = month
+
+    return target_year, target_month
 
 
 @app.command()
@@ -47,24 +60,28 @@ def set(
         ),
     ] = None,
 ) -> None:
-    """Set or update the budget for a specific month and year
+    """Set or update a budget for a specific month and year."""
 
-    Defaults to the currrent month and year if neither is provided. Both --year
-    and --month must be specified together if setting or updating manually.
-    """
+    # Get the year and month
+    target_year, target_month = _resolve_target_date(year, month)
 
-    target_year, target_month = _resolve_target_date(year=year, month=month)
+    state: AppState = ctx.obj
 
-    db: BudgetManager = ctx.obj["budget"]
-    console: Console = ctx.obj["console"]
+    # Get the database and console
+    db = state.budget
+    console = state.console
 
+    # Save the budget in the database
     result = db.set_budget(year=target_year, month=target_month, amount=budget)
-    if not result:
+
+    # Check whether the budget was saved
+    if result is False:
         console.print("[red]✖[/red] No budgets were updated.")
         raise typer.Exit()
 
     console.print(
-        f"[bold green]✓[/bold green] Budget was successfully updated for [cyan]{target_year}/{target_month}[/cyan]"
+        f"[bold green]✓[/bold green] Budget was successfully updated "
+        f"for [cyan]{target_year}/{target_month}[/cyan]"
     )
 
 
@@ -92,35 +109,41 @@ def list(
         ),
     ] = None,
 ) -> None:
-    """List all recorded budgets.
+    """Display all recorded budgets."""
 
-    Optionally filter results by year and/or month.
-    """
+    state: AppState = ctx.obj
 
-    db: BudgetManager = ctx.obj["budget"]
-    console: Console = ctx.obj["console"]
+    # Get the database and console
+    db = state.budget
+    console = state.console
+
+    # Get budgets from the database
     budgets = db.get_budgets(year=year, month=month)
 
+    # Check whether any budgets were found
     if not budgets:
         console.print("i [dim]No budgets found in the database.[/dim]")
         raise typer.Exit()
 
+    # Create a Rich table
     table = Table(title="Budgets", box=box.ROUNDED)
 
-    # Format: (column_name, style, justify)
-    columns = [
-        ("ID", "cyan", "left"),
-        ("Year", "cyan", "left"),
-        ("Month", "cyan", "left"),
-        ("Amount", "green", "right"),
-    ]
-    for column_name, style, justify in columns:
-        table.add_column(column_name, style=style, justify=justify)  # type: ignore
+    # Add table columns
+    table.add_column("ID", style="cyan", justify="left")
+    table.add_column("Year", style="cyan", justify="left")
+    table.add_column("Month", style="cyan", justify="left")
+    table.add_column("Amount", style="green", justify="right")
 
-    for dict_row in budgets:
-        rows = [str(row) for row in dict_row.values()]
-        table.add_row(*rows)
+    # Add database records to the table
+    for budget in budgets:
+        budget_id = str(budget["id"])
+        budget_year = str(budget["year"])
+        budget_month = str(budget["month"])
+        budget_amount = str(budget["amount"])
 
+        table.add_row(budget_id, budget_year, budget_month, budget_amount)
+
+    # Display the table
     console.print(table)
 
 
@@ -148,25 +171,31 @@ def remove(
         ),
     ] = None,
 ) -> None:
-    """Delete the budget for a specific year and month.
+    """Delete a budget for a specific year and month."""
 
-    Defaults to the current month and year if neither is provided. Both --year
-    and --month must be specified together if removing manually.
-    """
+    # Get the year and month
+    target_year, target_month = _resolve_target_date(year, month)
 
-    target_year, target_month = _resolve_target_date(year=year, month=month)
+    state: AppState = ctx.obj
 
-    db: BudgetManager = ctx.obj["budget"]
-    console: Console = ctx.obj["console"]
+    # Get the database and console
+    db = state.budget
+    console = state.console
 
+    # Delete the budget
     result = db.delete_budget(year=target_year, month=target_month)
-    if not result:
+
+    # Check whether the budget was deleted
+    if result is False:
         console.print(
-            f"[yellow]![/yellow] No budget found to remove for [cyan]{target_year}/{target_month}[/cyan]"
+            f"[yellow]![/yellow] No budget found to remove "
+            f"for [cyan]{target_year}/{target_month}[/cyan]"
         )
         raise typer.Exit()
+
     console.print(
-        f"[red]-[/red] Budget was successfully removed for [cyan]{target_year}/{target_month}[/cyan]"
+        f"[red]-[/red] Budget was successfully removed "
+        f"for [cyan]{target_year}/{target_month}[/cyan]"
     )
 
 

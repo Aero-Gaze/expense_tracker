@@ -1,11 +1,9 @@
 import typer
-from rich.console import Console
 
-from expense_tracker.analysis import ExpenseAnalytics
 from expense_tracker.cli.analysis import app as analysis_app
+from expense_tracker.cli.app_state import AppState
 from expense_tracker.cli.budget import app as budget_app
 from expense_tracker.cli.expense import app as expense_app
-from expense_tracker.database import BudgetManager, DatabaseManager, ExpenseManager
 
 app = typer.Typer(
     name="expense-tracker",
@@ -23,12 +21,7 @@ app.add_typer(analysis_app, name="analysis", help="All commands related to analy
 def main(
     ctx: typer.Context,
 ):
-    ctx.ensure_object(dict)
-    ctx.obj["db"] = DatabaseManager()
-    ctx.obj["analysis"] = ExpenseAnalytics(ctx.obj["db"])
-    ctx.obj["expense"] = ExpenseManager()
-    ctx.obj["budget"] = BudgetManager()
-    ctx.obj["console"] = Console()
+    ctx.obj = AppState()
 
 
 if __name__ == "__main__":
