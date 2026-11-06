@@ -1,4 +1,4 @@
-from expense_tracker.cli.app import app
+from expense_tracker.menu import main
 
 if __name__ == "__main__":
-    app()
+    main()
