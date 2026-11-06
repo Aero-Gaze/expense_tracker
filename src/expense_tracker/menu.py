@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from expense_tracker.database import ExpenseManager, BudgetManager
 from expense_tracker.analysis import ExpenseAnalytics
-
+from expense_tracker.database import BudgetManager, ExpenseManager
 
 # Create objects
 expense_manager = ExpenseManager()
@@ -20,6 +19,7 @@ def add_expense():
     expense_id = expense_manager.add_expense(
         name, category, amount, date, description or None
     )
+
     print("Expense added. ID:", expense_id)
 
 
@@ -147,56 +147,62 @@ def expense_summary():
 
 
 def main():
-    while True:
-        print("\n========== EXPENSE TRACKER ==========")
-        print("1. Add Expense")
-        print("2. View All Expenses")
-        print("3. Search Expense by ID")
-        print("4. Delete Expense")
-        print("5. Set Monthly Budget")
-        print("6. View Budgets")
-        print("7. Delete Budget")
-        print("8. View Spending by Category")
-        print("9. View Monthly Spending")
-        print("10. View Remaining Budget")
-        print("11. View Expense Summary")
-        print("0. Exit")
 
-        choice = input("\nEnter your choice: ")
+    try:
+        while True:
+            print("\n========== EXPENSE TRACKER ==========")
+            print("1. Add Expense")
+            print("2. View All Expenses")
+            print("3. Search Expense by ID")
+            print("4. Delete Expense")
+            print("5. Set Monthly Budget")
+            print("6. View Budgets")
+            print("7. Delete Budget")
+            print("8. View Spending by Category")
+            print("9. View Monthly Spending")
+            print("10. View Remaining Budget")
+            print("11. View Expense Summary")
+            print("0. Exit")
 
-        try:
-            if choice == "1":
-                add_expense()
-            elif choice == "2":
-                view_expenses()
-            elif choice == "3":
-                search_expense()
-            elif choice == "4":
-                delete_expense()
-            elif choice == "5":
-                set_budget()
-            elif choice == "6":
-                view_budgets()
-            elif choice == "7":
-                delete_budget()
-            elif choice == "8":
-                spending_by_category()
-            elif choice == "9":
-                monthly_spending()
-            elif choice == "10":
-                remaining_budget()
-            elif choice == "11":
-                expense_summary()
-            elif choice == "0":
-                print("Thank you for using Expense Tracker!")
-                break
-            else:
-                print("Invalid choice. Please try again.")
+            choice = input("\nEnter your choice: ")
 
-        except ValueError:
-            print("Invalid input. Please enter the correct value.")
-        except Exception as error:
-            print("An error occurred:", error)
+            try:
+                if choice == "1":
+                    add_expense()
+                elif choice == "2":
+                    view_expenses()
+                elif choice == "3":
+                    search_expense()
+                elif choice == "4":
+                    delete_expense()
+                elif choice == "5":
+                    set_budget()
+                elif choice == "6":
+                    view_budgets()
+                elif choice == "7":
+                    delete_budget()
+                elif choice == "8":
+                    spending_by_category()
+                elif choice == "9":
+                    monthly_spending()
+                elif choice == "10":
+                    remaining_budget()
+                elif choice == "11":
+                    expense_summary()
+                elif choice == "0":
+                    print("Exiting...")
+                    break
+                else:
+                    print("Invalid choice. Please try again.")
+
+            except ValueError:
+                print("Invalid input. Please enter the correct value.")
+
+            except Exception as error:
+                print("An error occurred:", error)
+
+    except KeyboardInterrupt:
+        print("\nProgram interrupted. Exiting safely.")
 
 
 if __name__ == "__main__":
