@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from expense_tracker.expense_manager import ExpenseManager
+from .expense_manager import ExpenseManager
 
 # Create expense manager
 expense_manager = ExpenseManager()
